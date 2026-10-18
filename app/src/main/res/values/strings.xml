@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">轻松阅读</string>
+    <string name="library">书架</string>
+    <string name="stats">统计</string>
+    <string name="settings">设置</string>
+    <string name="import_book">导入图书</string>
+    <string name="empty_library">书架空空，点右下角导入 EPUB / PDF / TXT</string>
+    <string name="open_book">打开</string>
+    <string name="delete_book">删除</string>
+    <string name="reading_progress">阅读进度</string>
+    <string name="no_books">暂无图书</string>
+    <string name="tts">朗读</string>
+    <string name="all_features_unlocked">全部高级功能已解锁</string>
+</resources>

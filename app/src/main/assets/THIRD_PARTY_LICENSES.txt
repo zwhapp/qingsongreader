@@ -1,0 +1,31 @@
+OpenReader 第三方许可声明（随 APK 分发摘要）
+==========================================
+
+OpenReader 以 GNU Affero General Public License v3.0 (AGPL-3.0) 发布。
+完整许可证文本见项目仓库根目录的 LICENSE 文件；完整第三方清单见
+THIRD-PARTY-NOTICES.md。
+
+内置数据（assets/dict/）
+-----------------------
+- CC-CEDICT 汉英/英汉词典（cedict.tsv）：CC BY-SA 4.0。
+  完整许可见同目录 CC-CEDICT-LICENSE.txt。署名：CC-CEDICT。
+- Unihan 汉字表（hanzi_basic.json）：Unicode Data Files License（© Unicode, Inc.）。
+  仅含部首 / 笔画等公开信息，不含任何版权词典（如《新华字典》）的释义内容。
+  详见同目录 UNIHAN-NOTICE.txt。
+
+第三方开源库
+------------
+- Jetpack Compose / AndroidX（Compose UI、Material3、Activity、Navigation、
+  Lifecycle、Room、DataStore）：Apache-2.0，Google LLC
+- Material Icons Extended：Apache-2.0，Google LLC
+- jsoup 1.18.1：MIT，Jonathan Hedley
+- OkHttp 4.12.0：Apache-2.0，Square, Inc.
+- Coil 2.6.0：Apache-2.0，Coil 贡献者
+- Kotlin / kotlinx-coroutines：Apache-2.0，JetBrains s.r.o.
+
+合规要点
+--------
+- 无硬编码密钥 / 凭证：所有云端与 AI 凭据均由用户自行填写，仅存于本机。
+- 付费能力以「用户自带 Key / 自建 WebDAV」方式提供，未绕过任何服务端鉴权或 DRM。
+- 应用名 OpenReader，未使用 Readest 商标或标识。
+- 不收集、不上传用户书库内容。隐私说明见仓库 PRIVACY.md。

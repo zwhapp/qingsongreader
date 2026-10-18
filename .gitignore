@@ -1,0 +1,21 @@
+build/
+.gradle/
+.kotlin/
+.idea/
+local.properties
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# build logs (local only)
+*.log
+
+# temp dex inspection dir
+dexcheck/
+
+# release artifacts (publish via GitHub Releases, not the repo)
+*.apk
+
+# generated screenshots
+screenshot_*.png

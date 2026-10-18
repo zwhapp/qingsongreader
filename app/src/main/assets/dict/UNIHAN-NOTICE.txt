@@ -1,0 +1,15 @@
+Unihan Database Extract (hanzi_basic.json)
+==========================================
+
+Copyright © 1993-2023 Unicode, Inc. All rights reserved.
+
+Source: Unicode® Unihan Database
+        https://www.unicode.org/reports/tr38/
+
+License: Unicode Data Files and Software License
+         https://www.unicode.org/license.html
+
+This extract contains only public metadata derived from the Unihan database:
+radical, stroke count, and short English glosses taken from the Unihan
+kDefinition field. It does NOT contain any copyrighted dictionary definitions
+(for example, the definitions of the Xinhua Dictionary / 新华字典).
