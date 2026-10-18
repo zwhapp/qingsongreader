@@ -177,3 +177,10 @@ CSV/TSV：`apple,ˈæpl,苹果` 或 `apple\t苹果`；也支持 `{"apple": "苹�
 - **墨水屏 / Kindle 适配**：新增「墨水屏模式」——纯黑底白字、去除彩色与动画，减少电纸书的残影与刷新；可叠加「衬线字体」，适配 Kindle Fire、文石、掌阅等 Android 电纸书。
 
 > 更新通道指向公开仓库 `zwhapp/qingsongreader` 的 Releases；APK 下载自 GitHub CDN。
+
+## v1.1.1 更新
+
+- **修复导入 EPUB 显示乱码**：通过系统文件选择器导入时，部分内容提供者返回的 URI 不带文件扩展名（如 `content://.../document/1000054575`），应用误判为纯文本，把 ZIP 二进制原样显示。现在：
+  - 导入时先解析文件的真实显示名（`OpenableColumns.DISPLAY_NAME`）；
+  - 再读取文件头魔数判定真实格式（EPUB `PK..mimetype` / PDF `%PDF` / MOBI·AZW3 `BOOKMOBI`+EXTH 121），无扩展名也能正确识别；
+  - 修复前误存为 TXT 的书籍**无需删除重导**，打开时自动识别并修正（数据库记录与文件同步改为正确格式）。
