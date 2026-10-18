@@ -239,16 +239,16 @@ def blob_exists(sha):
 
 
 def cmd_push(message):
-    # Orphan commit + force-update + reconcile => local main == remote main.
+    # Normal commit on top of the current remote main. Local main == remote main
+    # is already guaranteed, so the parent chain stays consistent on both sides.
     git("add", "-A")
     files = git("ls-files", "--cached").decode("utf-8").splitlines()
+    parent_sha = api_get("/repos/%s/git/refs/heads/main" % REPO)["object"]["sha"]
     entries = []
     for f in files:
         if not f.strip():
             continue
         blob_sha = git("hash-object", f).decode().strip()
-        raw = git("cat-file", "blob", blob_sha).decode("utf-8", "replace")
-        # We need raw bytes; re-read binary safely
         raw_bytes = git("cat-file", "blob", blob_sha)
         if not blob_exists(blob_sha):
             api_post("/repos/%s/git/blobs" % REPO, {
@@ -262,12 +262,13 @@ def cmd_push(message):
     commit = api_post("/repos/%s/git/commits" % REPO, {
         "message": message,
         "tree": tree["sha"],
+        "parents": [parent_sha],
         "author": {"name": AUTHOR_NAME, "email": AUTHOR_EMAIL, "date": date_iso},
         "committer": {"name": AUTHOR_NAME, "email": AUTHOR_EMAIL, "date": date_iso},
     })
     new_sha = commit["sha"]
     api_patch("/repos/%s/git/refs/heads/main" % REPO, {"sha": new_sha, "force": True})
-    print("PUSHED (orphan) %s" % new_sha)
+    print("PUSHED %s (parent %s)" % (new_sha, parent_sha[:10]))
     # Reconcile local repo onto the new remote SHA.
     local_sha = reconstruct(new_sha)
     git("reset", "--hard", local_sha)

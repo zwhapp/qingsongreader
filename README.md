@@ -1,56 +1,6 @@
 # 轻松阅读（qingsongreader）
 
-安卓原生电子书阅读器。功能对标 Readest（开源 AGPL-3.0 项目），用 Kotlin + Jetpack Compose 重写，**本地不存在任何付费门禁**：主题、字体、排版、朗读、批注、统计、同步入口全部默认开放。
-
-> 关于「收费功能全部开放」的说明见下文 [付费功能是怎么开放的](#付费功能是怎么开放的)，请先看这一节。
-
----
-
-## 功能对照
-
-| 能力 | Readest | 轻松阅读 | 备注 |
-| --- | --- | --- | --- |
-| EPUB（2/3） | ✅ | ✅ | 自研解析：container.xml → OPF → spine → nav/NCX 目录 |
-| PDF | ✅ | ✅ | `android.graphics.pdf.PdfRenderer`（与 Readest 安卓端同一方案） |
-| TXT / Markdown | ✅ | ✅ | Markdown 渲染标题、列表、引用、代码块、行内样式 |
-| 分页 / 滚动两种阅读模式 | ✅ | ✅ | CSS column + JS 桥接，与 foliate-js 思路一致 |
-| 高亮（多色）/ 笔记 / 书签 | ✅ | ✅ | 字符偏移定位，跨会话稳定 |
-| 目录跳转 / 全文搜索 | ✅ | ✅ | 目录支持 EPUB3 nav 与 EPUB2 NCX |
-| 字体、字号、行距、边距、对齐 | ✅ | ✅ | 实时生效 |
-| 明亮 / 纸色 / 夜间主题 | ✅ | ✅ | |
-| 朗读（TTS） | ✅（Plus 起不限时长） | ✅ 无限制 | 系统 TTS 引擎，无服务端、无配额 |
-| AI 翻译 / 摘要 / 提问 | ✅（按档位限额） | ✅ 无应用侧限额 | 用户填自己的 API Key（OpenAI 兼容端点） |
-| 云同步 | ✅（500MB / 5GB / 20GB 分档） | ✅ 无应用侧容量限制 | 用户自己的 WebDAV 服务器 |
-| 阅读统计 | 🛠 建设中 | ✅ | 总时长、今日时长、按书目 |
-| 批注导出 | ✅ | ✅ | Markdown 导出 / 剪贴板 |
-| 词典查词 | ✅（内置源 + Yomitan 离线包） | ✅ | 内置汉英/英汉词典（11.4 万 + 4 万条）+ 汉字表，离线优先 |
-| 网盘导入（百度 / 阿里） | ❌ | ✅ | 用自己的 AppKey 走官方开放平台授权，浏览网盘直接导入 |
-| WebDAV 同步 | ❌ | ✅ | 自建，无容量限制 |
-| 文件关联（用本应用打开） | ✅ | ✅ | epub/pdf/txt/md |
-| MOBI / AZW3（KF8） | ✅ | ✅ | 自研 PDB/MOBI 解析，无压缩 + PalmDOC，按标题分章 |
-| FB2 / CBZ | ✅ | ❌ | 未实现 |
-| 平行阅读（双书对照） | ✅ | ❌ | 未实现 |
-| OPDS / Calibre 接入 | ✅ | ❌ | 未实现 |
-| KOReader 同步 | ✅ | ❌ | 未实现 |
-| 词典离线包 / Yomitan | ✅ | ❌ | 未实现 |
-
----
-
-## 付费功能是怎么开放的
-
-Readest 的付费档位（`apps/readest-app/src/libs/payment/entitlements.ts`、`app/user/utils/plan.ts`）分两类：
-
-**A. 客户端能力**（自定义主题/字体/排版、朗读入口、统计、导出等）
-→ 轻松阅读 里这一类**完全没有门禁**。`features/FeatureGate.kt` 是唯一的开关来源，所有 `isEnabled()` 无条件返回 `true`，没有账号、没有订阅校验、没有 entitlement 请求。
-
-**B. 服务端资源**（云存储 500MB/5GB/20GB、AI 翻译 10K/100K/500K 字符/天、AI 朗读时长、DeepL Pro 通道）
-→ 这些不是软件功能，而是**官方服务器的付费资源**，用量由服务端按账号配额结算。轻松阅读 不会去伪造凭证或绕过它的订阅校验（那属于未经授权使用他人的付费服务）。取而代之的做法是「自带钥匙」：
-
-* **同步**：填你自己的 WebDAV（Nextcloud / ownCloud / nginx-webdav…），容量就是你自己的盘，应用侧无任何限制；也可以一键导出 JSON 备份。
-* **AI**：填你自己的 API Key 与 OpenAI 兼容端点（官方 API、OpenRouter、Ollama、自建网关都行），用量记在你自己的账号上。
-* **朗读**：直接用系统 TTS 引擎，不需要任何服务器。
-
-这样得到的效果是：Readest 里需要订阅才解锁的**功能**，在这里全部开放；而原本要按流量/容量付费的**服务**，换成由你自己提供、没有中间商。
+安卓原生电子书阅读器，Kotlin + Jetpack Compose 编写。支持 EPUB / PDF / MOBI / AZW3 / TXT / Markdown；主题、字体、排版、朗读、批注、统计、同步全部默认开放，无账号体系、本地优先。
 
 ---
 
@@ -105,7 +55,7 @@ cd 轻松阅读
 
 ## 许可证
 
-AGPL-3.0，与参考项目 Readest 的许可证保持一致。功能设计参照了 Readest 的公开源码与产品形态，实现为独立编写，未包含 Readest 的商标、图标或品牌素材。若你分发修改版，AGPL 要求同样开源你的改动。
+AGPL-3.0。完整许可证见 [`LICENSE`](./LICENSE)。若你分发修改版，AGPL 要求同样开源你的改动。
 
 第三方依赖：Jsoup（MIT）、OkHttp（Apache-2.0）、Coil（Apache-2.0）、AndroidX（Apache-2.0）。
 
@@ -200,7 +150,7 @@ CSV/TSV：`apple,ˈæpl,苹果` 或 `apple\t苹果`；也支持 `{"apple": "苹�
 
 - 轻松阅读 以 **GNU Affero General Public License v3.0 (AGPL-3.0)** 发布。
   完整许可证见 [`LICENSE`](./LICENSE)。
-- 本项目是对 Readest（AGPL-3.0）功能的重写实现，遵循 AGPL-3.0 的「同源共享」要求。
+- 本项目以 **GNU Affero General Public License v3.0 (AGPL-3.0)** 发布，遵循「同源共享」要求。
 - 第三方组件与内置数据的许可与署名见 [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md)。
 - 隐私说明见 [`PRIVACY.md`](./PRIVACY.md)。
 
@@ -210,7 +160,7 @@ CSV/TSV：`apple,ˈæpl,苹果` 或 `apple\t苹果`；也支持 `{"apple": "苹�
 
 ### 合规要点
 - 应用**不含任何硬编码密钥 / 凭证**；百度 / 阿里 / AI 的凭据由用户自行填写，仅存本机。
-- 原 Readest 的付费能力在服务端，本应用以「用户自带 Key / 自建 WebDAV」等价提供，**未逆向或绕过任何服务端鉴权 / 数字版权管理**。
+- 云同步与 AI 能力由「用户自带 Key / 自建 WebDAV」提供，**未逆向或绕过任何第三方服务端鉴权 / 数字版权管理**。
 - 不打包受版权保护的词典正文（如《新华字典》《现代汉语词典》释义）；如需使用，由「词库中心」在你确认许可后自行下载（部分来自 MIT 许可的 pwxcoo/chinese-xinhua）。
 
 ---
@@ -218,7 +168,7 @@ CSV/TSV：`apple,ˈæpl,苹果` 或 `apple\t苹果`；也支持 `{"apple": "苹�
 ## 项目地址
 - 仓库：https://github.com/zwhapp/qingsongreader
 - 问题反馈：https://github.com/zwhapp/qingsongreader/issues
-- 首个发布版本：v1.0.0（APK 请到 Releases 页面下载）
+- 最新发布版本：v1.1.0（APK 请到 Releases 页面下载）
 
 ## v1.1.0 更新
 
@@ -226,4 +176,4 @@ CSV/TSV：`apple,ˈæpl,苹果` 或 `apple\t苹果`；也支持 `{"apple": "苹�
 - **自动更新**：设置页新增「检查更新 / 启动时自动检查」，基于 GitHub Releases 比对语义化版本号，发现新版本可一键下载 APK 并通过系统安装器升级（无需电脑）。
 - **墨水屏 / Kindle 适配**：新增「墨水屏模式」——纯黑底白字、去除彩色与动画，减少电纸书的残影与刷新；可叠加「衬线字体」，适配 Kindle Fire、文石、掌阅等 Android 电纸书。
 
-> 更新通道指向公开仓库 `zwhapp/qingsongreader` 的 Releases；APK 下载自 GitHub CDN，本应用不代理任何付费服务。
+> 更新通道指向公开仓库 `zwhapp/qingsongreader` 的 Releases；APK 下载自 GitHub CDN。
