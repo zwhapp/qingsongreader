@@ -240,17 +240,20 @@ object ReaderScripts {
       return;
     }
     // Tap zones: tapping the bottom-right area turns to the next page, the
-    // bottom-left area to the previous one. Only the lower part of the page,
-    // so links and body text elsewhere keep working normally.
+    // bottom-left area to the previous one, and the upper/middle part of the
+    // page (where body text lives) toggles the toolbars for distraction-free
+    // reading. Links are handled above and never reach this branch.
     // NOTE: window.innerWidth/innerHeight report the *content* size here (the
     // layout viewport expands to the multi-column width), so the visible
     // viewport metrics must come from visualViewport instead.
     var h = (window.visualViewport && window.visualViewport.height) || document.body.clientHeight;
+    var w = (window.visualViewport && window.visualViewport.width) || document.body.clientWidth;
     if (e.clientY >= h * 0.6) {
-      var w = (window.visualViewport && window.visualViewport.width) || document.body.clientWidth;
       if (window.orBridge && window.orBridge.onTapZone) {
         window.orBridge.onTapZone(e.clientX >= w / 2 ? 'next' : 'prev');
       }
+    } else if (window.orBridge && window.orBridge.onTapZone) {
+      window.orBridge.onTapZone('center');
     }
   });
 
@@ -264,6 +267,20 @@ object ReaderScripts {
     var sel = window.getSelection();
     var text = sel ? sel.toString() : '';
     if (window.orBridge && window.orBridge.onSelection) window.orBridge.onSelection(text);
+  });
+
+  // The system text-selection handles keep adjusting the range long after
+  // touchend, so mouseup/touchend alone miss most selections. Watch
+  // selectionchange (debounced) and report the final range as well.
+  var selTimer = null;
+  document.addEventListener('selectionchange', function () {
+    if (selTimer) clearTimeout(selTimer);
+    selTimer = setTimeout(function () {
+      selTimer = null;
+      var sel = window.getSelection();
+      var text = sel ? sel.toString() : '';
+      if (window.orBridge && window.orBridge.onSelection) window.orBridge.onSelection(text);
+    }, 250);
   });
 })();
     """.trimIndent()

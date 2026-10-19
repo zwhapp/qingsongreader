@@ -43,7 +43,7 @@ import com.qingsongreader.data.repo.SearchHit
 import com.qingsongreader.reader.epub.TocEntry
 import kotlinx.coroutines.launch
 
-enum class ReaderSheet { NONE, TOC, SETTINGS, ANNOTATIONS, SEARCH, AI, DICTIONARY }
+enum class ReaderSheet { NONE, TOC, SETTINGS, ANNOTATIONS, SEARCH, DICTIONARY }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -313,77 +313,3 @@ fun SearchSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AiSheet(
-    selectedText: String,
-    onTranslate: suspend (String, String) -> Result<String>,
-    onSummarize: suspend (String) -> Result<String>,
-    onAsk: suspend (String, String) -> Result<String>,
-    onDismiss: () -> Unit
-) {
-    var output by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var question by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
-
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text("AI 助手（使用你自己的 API Key）", style = MaterialTheme.typography.titleMedium)
-            if (selectedText.isNotBlank()) {
-                Text(
-                    text = "选中：${selectedText.take(120)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    scope.launch {
-                        busy = true
-                        output = onTranslate(selectedText, "中文").getOrDefault("翻译失败")
-                        busy = false
-                    }
-                }, enabled = selectedText.isNotBlank() && !busy) { Text("翻译") }
-                Button(onClick = {
-                    scope.launch {
-                        busy = true
-                        output = onSummarize(selectedText).getOrDefault("摘要失败")
-                        busy = false
-                    }
-                }, enabled = selectedText.isNotBlank() && !busy) { Text("摘要") }
-            }
-            OutlinedTextField(
-                value = question,
-                onValueChange = { question = it },
-                label = { Text("提问") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            Button(onClick = {
-                scope.launch {
-                    busy = true
-                    output = onAsk(question, selectedText).getOrDefault("请求失败")
-                    busy = false
-                }
-            }, enabled = question.isNotBlank() && !busy) { Text("提问") }
-
-            if (busy) {
-                Text("处理中…", style = MaterialTheme.typography.bodySmall)
-            }
-            if (output.isNotBlank()) {
-                Text(
-                    text = output,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(bottom = 24.dp)
-                )
-            }
-        }
-    }
-}

@@ -43,9 +43,6 @@ data class ReaderSettings(
     val useSerif: Boolean = false,
     /** Automatically check GitHub for updates on launch. */
     val autoCheckUpdate: Boolean = false,
-    val aiBaseUrl: String = "https://api.openai.com/v1",
-    val aiApiKey: String = "",
-    val aiModel: String = "gpt-4o-mini",
     val webdavUrl: String = "",
     val webdavUser: String = "",
     val webdavPassword: String = ""
@@ -71,9 +68,6 @@ class SettingsRepository(private val context: Context) {
         val EINK_MODE = booleanPreferencesKey("eink_mode")
         val USE_SERIF = booleanPreferencesKey("use_serif")
         val AUTO_CHECK_UPDATE = booleanPreferencesKey("auto_check_update")
-        val AI_BASE_URL = stringPreferencesKey("ai_base_url")
-        val AI_API_KEY = stringPreferencesKey("ai_api_key")
-        val AI_MODEL = stringPreferencesKey("ai_model")
         val WEBDAV_URL = stringPreferencesKey("webdav_url")
         val WEBDAV_USER = stringPreferencesKey("webdav_user")
         val WEBDAV_PASSWORD = stringPreferencesKey("webdav_password")
@@ -101,9 +95,6 @@ class SettingsRepository(private val context: Context) {
             p[Keys.EINK_MODE] = next.einkMode
             p[Keys.USE_SERIF] = next.useSerif
             p[Keys.AUTO_CHECK_UPDATE] = next.autoCheckUpdate
-            p[Keys.AI_BASE_URL] = next.aiBaseUrl
-            p[Keys.AI_API_KEY] = next.aiApiKey
-            p[Keys.AI_MODEL] = next.aiModel
             p[Keys.WEBDAV_URL] = next.webdavUrl
             p[Keys.WEBDAV_USER] = next.webdavUser
             p[Keys.WEBDAV_PASSWORD] = next.webdavPassword
@@ -122,8 +113,6 @@ class SettingsRepository(private val context: Context) {
     suspend fun setKeepScreenOn(value: Boolean) = update { it.copy(keepScreenOn = value) }
     suspend fun setFullscreen(value: Boolean) = update { it.copy(fullscreen = value) }
     suspend fun setTts(rate: Float, pitch: Float) = update { it.copy(ttsRate = rate, ttsPitch = pitch) }
-    suspend fun setAiConfig(baseUrl: String, apiKey: String, model: String) =
-        update { it.copy(aiBaseUrl = baseUrl, aiApiKey = apiKey, aiModel = model) }
     suspend fun setWebDav(url: String, user: String, password: String) =
         update { it.copy(webdavUrl = url, webdavUser = user, webdavPassword = password) }
 
@@ -145,9 +134,6 @@ class SettingsRepository(private val context: Context) {
         einkMode = p[Keys.EINK_MODE] ?: false,
         useSerif = p[Keys.USE_SERIF] ?: false,
         autoCheckUpdate = p[Keys.AUTO_CHECK_UPDATE] ?: false,
-        aiBaseUrl = p[Keys.AI_BASE_URL] ?: "https://api.openai.com/v1",
-        aiApiKey = p[Keys.AI_API_KEY] ?: "",
-        aiModel = p[Keys.AI_MODEL] ?: "gpt-4o-mini",
         webdavUrl = p[Keys.WEBDAV_URL] ?: "",
         webdavUser = p[Keys.WEBDAV_USER] ?: "",
         webdavPassword = p[Keys.WEBDAV_PASSWORD] ?: ""

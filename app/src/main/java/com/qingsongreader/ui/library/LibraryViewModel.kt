@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -21,6 +22,16 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     fun import(uri: Uri, suggestedName: String? = null, onResult: (Result<BookEntity>) -> Unit = {}) {
         viewModelScope.launch {
             onResult(runCatching { repository.import(uri, suggestedName) })
+        }
+    }
+
+    /**
+     * Imports a file already on disk (WebDAV download, WeChat download folder,
+     * ...). Returns the imported book through [onResult].
+     */
+    fun importFile(source: File, displayName: String, onResult: (Result<BookEntity>) -> Unit = {}) {
+        viewModelScope.launch {
+            onResult(runCatching { repository.importFile(source, displayName) })
         }
     }
 

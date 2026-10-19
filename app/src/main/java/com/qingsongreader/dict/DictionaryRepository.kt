@@ -53,7 +53,12 @@ class DictionaryRepository(private val context: Context) {
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .callTimeout(30, TimeUnit.SECONDS)
+        // The dictionary packs are 1-18 MB; a 30 s total call timeout aborted
+        // mid-download on anything slower than ~600 KB/s, which is exactly what
+        // users on domestic mobile networks saw ("所有下载源均不可用"). Keep a
+        // generous total budget and rely on the read timeout to catch stalls.
+        .readTimeout(60, TimeUnit.SECONDS)
+        .callTimeout(0, TimeUnit.MILLISECONDS)
         .build()
 
     fun count() = dao.count()

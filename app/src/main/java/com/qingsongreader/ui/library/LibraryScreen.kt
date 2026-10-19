@@ -82,6 +82,10 @@ fun LibraryScreen(
     var showCloudPicker by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     var pendingDelete by remember { mutableStateOf<BookEntity?>(null) }
+    var showAddPicker by remember { mutableStateOf(false) }
+    var showWebdavPicker by remember { mutableStateOf(false) }
+    var showWeixinPicker by remember { mutableStateOf(false) }
+    val webdavSettings by settingsRepository.settings.collectAsState(initial = null)
 
     fun reportImport(result: Result<BookEntity>) {
         coroutineScope.launch {
@@ -123,19 +127,7 @@ fun LibraryScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                launcher.launch(
-                    arrayOf(
-                        "application/epub+zip",
-                        "application/pdf",
-                        "application/x-mobipocket-ebook",
-                        "application/vnd.amazon.mobi8-ebook",
-                        "text/plain",
-                        "text/markdown",
-                        "*/*"
-                    )
-                )
-            }) {
+            FloatingActionButton(onClick = { showAddPicker = true }) {
                 Icon(Icons.Default.Add, contentDescription = "导入图书")
             }
         }
@@ -192,6 +184,88 @@ fun LibraryScreen(
             dismissButton = {
                 TextButton(onClick = { pendingDelete = null }) { Text("取消") }
             }
+        )
+    }
+
+    // "Add a book" entry: three import routes in one dialog.
+    if (showAddPicker) {
+        AlertDialog(
+            onDismissRequest = { showAddPicker = false },
+            title = { Text("加入新书") },
+            text = {
+                Column {
+                    TextButton(onClick = {
+                        showAddPicker = false
+                        launcher.launch(
+                            arrayOf(
+                                "application/epub+zip",
+                                "application/pdf",
+                                "application/x-mobipocket-ebook",
+                                "application/vnd.amazon.mobi8-ebook",
+                                "text/plain",
+                                "text/markdown",
+                                "*/*"
+                            )
+                        )
+                    }) { Text("从本地文件导入") }
+                    TextButton(onClick = {
+                        showAddPicker = false
+                        showWebdavPicker = true
+                    }) { Text("从我的 WebDAV 导入") }
+                    TextButton(onClick = {
+                        showAddPicker = false
+                        showWeixinPicker = true
+                    }) { Text("从微信文件导入") }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAddPicker = false }) { Text("取消") }
+            }
+        )
+    }
+
+    if (showWebdavPicker) {
+        val dav = webdavSettings
+        if (dav == null) {
+            // settings not loaded yet — wait silently
+        } else if (dav.webdavUrl.isBlank()) {
+            AlertDialog(
+                onDismissRequest = { showWebdavPicker = false },
+                title = { Text("还没有配置 WebDAV") },
+                text = { Text("请先在「设置 → 同步」里填写你自己的 WebDAV 地址与账号，再回来导入。") },
+                confirmButton = {
+                    TextButton(onClick = { showWebdavPicker = false }) { Text("知道了") }
+                }
+            )
+        } else {
+            WebDavImportSheet(
+                url = dav.webdavUrl,
+                user = dav.webdavUser,
+                password = dav.webdavPassword,
+                onImportFile = { file, name -> viewModel.importFile(file, name, ::reportImport) },
+                onDismiss = { showWebdavPicker = false }
+            )
+        }
+    }
+
+    if (showWeixinPicker) {
+        WeixinImportSheet(
+            onImportFile = { file, name -> viewModel.importFile(file, name, ::reportImport) },
+            onPickDocument = {
+                showWeixinPicker = false
+                launcher.launch(
+                    arrayOf(
+                        "application/epub+zip",
+                        "application/pdf",
+                        "application/x-mobipocket-ebook",
+                        "application/vnd.amazon.mobi8-ebook",
+                        "text/plain",
+                        "text/markdown",
+                        "*/*"
+                    )
+                )
+            },
+            onDismiss = { showWeixinPicker = false }
         )
     }
 

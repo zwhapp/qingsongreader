@@ -5,7 +5,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.qingsongreader.ai.AiClient
 import com.qingsongreader.data.db.BookEntity
 import com.qingsongreader.data.db.BookmarkEntity
 import com.qingsongreader.data.db.HighlightEntity
@@ -258,20 +257,9 @@ class ReaderViewModel(
         _state.value = _state.value.copy(searchHits = emptyList(), query = "")
     }
 
-    // -------------------------------------------------------------------- ai
-
-    private fun aiClient(): AiClient = AiClient(settings.value)
-
-    suspend fun translate(text: String, targetLanguage: String): Result<String> =
-        aiClient().translate(text, targetLanguage)
-
-    suspend fun summarize(text: String): Result<String> = aiClient().summarize(text)
-
-    suspend fun ask(question: String, context: String): Result<String> = aiClient().ask(question, context)
-
     // ------------------------------------------------------------- dictionary
 
-    /** Looks a word up: offline pack -> free online dictionary -> AI fallback. */
+    /** Looks a word up: offline pack -> free online dictionary. */
     fun lookup(word: String) {
         val query = word.trim().take(60)
         if (query.isBlank()) return
@@ -282,7 +270,7 @@ class ReaderViewModel(
                 dictError = null,
                 dictEntry = null
             )
-            dictionary.lookup(query) { aiClient().explain(it) }
+            dictionary.lookup(query)
                 .fold(
                     onSuccess = { entry ->
                         _state.value = _state.value.copy(dictEntry = entry, dictLoading = false, dictError = null)

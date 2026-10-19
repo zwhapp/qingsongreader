@@ -120,9 +120,91 @@ class WebDavSync(
         }
     }
 
+    /** One entry of a WebDAV directory listing. */
+    data class WebDavItem(
+        val name: String,
+        val isDir: Boolean,
+        val size: Long
+    )
+
+    /**
+     * Lists the children of [name] (e.g. "" for the root) via PROPFIND Depth:1,
+     * so the "import from my WebDAV" flow can let the user browse and pick a
+     * book file instead of guessing names.
+     */
+    suspend fun list(name: String): Result<List<WebDavItem>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val body = """<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop><D:resourcetype/><D:getcontentlength/></D:prop>
+</D:propfind>"""
+            val request = Request.Builder()
+                .url(remoteUrl(name) + "/")
+                .header("Authorization", auth())
+                .header("Depth", "1")
+                .method("PROPFIND", body.toRequestBody("application/xml".toMediaType()))
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful && response.code != 207) {
+                    error("列目录失败：HTTP ${response.code}")
+                }
+                val xml = response.body?.string() ?: error("空响应")
+                parsePropfind(xml)
+            }
+        }
+    }
+
+    /** Minimal multistatus parser: enough for Nextcloud/nginx-webdav replies. */
+    private fun parsePropfind(xml: String): List<WebDavItem> {
+        val parser = org.xmlpull.v1.XmlPullParserFactory.newInstance().newPullParser()
+        parser.setInput(xml.reader())
+        val items = ArrayList<WebDavItem>()
+        var currentHref: String? = null
+        var currentIsDir = false
+        var currentSize = 0L
+        var inHref = false
+        var event = parser.eventType
+        while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+            when (event) {
+                org.xmlpull.v1.XmlPullParser.START_TAG -> {
+                    when (parser.name.lowercase()) {
+                        "response", "d:response", "ms-response" -> {
+                            currentHref = null; currentIsDir = false; currentSize = 0L
+                        }
+                        "href", "d:href" -> inHref = true
+                        "collection", "d:collection" -> currentIsDir = true
+                        "getcontentlength", "d:getcontentlength" -> {
+                            val text = parser.nextText()
+                            currentSize = text.toLongOrNull() ?: 0L
+                        }
+                    }
+                }
+                org.xmlpull.v1.XmlPullParser.TEXT -> {
+                    if (inHref && currentHref == null) currentHref = parser.text.trim()
+                }
+                org.xmlpull.v1.XmlPullParser.END_TAG -> {
+                    when (parser.name.lowercase()) {
+                        "href", "d:href" -> inHref = false
+                        "response", "d:response", "ms-response" -> {
+                            val href = currentHref
+                            if (!href.isNullOrBlank()) {
+                                val decoded = java.net.URLDecoder.decode(href.substringAfterLast('/'), "UTF-8")
+                                if (decoded.isNotBlank()) {
+                                    items += WebDavItem(decoded, currentIsDir, currentSize)
+                                }
+                            }
+                            currentHref = null
+                        }
+                    }
+                }
+            }
+            event = parser.next()
+        }
+        return items
+    }
+
     /** Downloads a binary file (a book) into [dest] with 0-100 progress. */
-    suspend fun downloadFile(
-        name: String,
+    suspend fun downloadFile(        name: String,
         dest: File,
         onProgress: (Int) -> Unit = {}
     ): Result<File> = withContext(Dispatchers.IO) {

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmarks
@@ -23,7 +24,6 @@ import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -88,6 +88,7 @@ fun ReaderScreen(
 
     var sheet by remember { mutableStateOf(ReaderSheet.NONE) }
     var chromeVisible by remember { mutableStateOf(true) }
+    var speedMenuVisible by remember { mutableStateOf(false) }
     var pageCount by remember { mutableIntStateOf(1) }
     var sliderValue by remember { mutableFloatStateOf(0f) }
     var dragX by remember { mutableFloatStateOf(0f) }
@@ -273,9 +274,6 @@ fun ReaderScreen(
                         IconButton(onClick = { sheet = ReaderSheet.ANNOTATIONS }) {
                             Icon(Icons.Default.Bookmarks, contentDescription = "批注")
                         }
-                        IconButton(onClick = { sheet = ReaderSheet.AI }) {
-                            Icon(Icons.Default.SmartToy, contentDescription = "AI")
-                        }
                         IconButton(onClick = { sheet = ReaderSheet.SETTINGS }) {
                             Icon(Icons.Default.FormatSize, contentDescription = "排版")
                         }
@@ -284,6 +282,9 @@ fun ReaderScreen(
             }
         },
         bottomBar = {
+            // Full-screen reading: tapping the page centre hides both bars;
+            // the toolbar-toggle text below restores them.
+            if (chromeVisible) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { turnPage(-1) }) { Text("上一页") }
@@ -326,13 +327,27 @@ fun ReaderScreen(
                                 Text("朗读", modifier = Modifier.padding(start = 4.dp))
                             }
                             TextButton(onClick = { tts.stop() }) { Text("停止") }
+                            // Speech rate is only discoverable here: the reader
+                            // adjusts it while hearing the voice, no need to dig
+                            // through the typography sheet.
+                            Box {
+                                TextButton(onClick = { speedMenuVisible = !speedMenuVisible }) {
+                                    Text("语速 " + String.format("%.1f", settings.ttsRate) + "×")
+                                }
+                                SpeedMenu(
+                                    expanded = speedMenuVisible,
+                                    rate = settings.ttsRate,
+                                    onRateChange = { next -> applySettings(settings.copy(ttsRate = next)) },
+                                    onDismiss = { speedMenuVisible = false }
+                                )
+                            }
                             TextButton(onClick = { viewModel.addBookmark() }) { Text("书签") }
                             TextButton(onClick = { chromeVisible = !chromeVisible }) {
                                 Text(if (chromeVisible) "沉浸" else "工具栏")
-                            }
-                        }
+                            }                        }
                     }
                 }
+            }
             }
     ) { padding ->
         Box(
@@ -354,6 +369,7 @@ fun ReaderScreen(
                             file = file,
                             page = state.chapterIndex,
                             onTurnPage = { delta -> turnPage(delta) },
+                            onToggleChrome = { chromeVisible = !chromeVisible },
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -400,7 +416,13 @@ fun ReaderScreen(
                                         }
                                     },
                                     onTapZone = { side ->
-                                        turnPage(if (side == "next") 1 else -1)
+                                        when (side) {
+                                            // Tapping the body of the page toggles
+                                            // distraction-free (toolbar-less) reading.
+                                            "center" -> chromeVisible = !chromeVisible
+                                            "next" -> turnPage(1)
+                                            else -> turnPage(-1)
+                                        }
                                     }
                                 ),
                                 ReaderScripts.BRIDGE
@@ -469,7 +491,6 @@ fun ReaderScreen(
                         )
                         runCatching { context.startActivity(intent) }
                     }) { Text("网页") }
-                    TextButton(onClick = { sheet = ReaderSheet.AI }) { Text("AI") }
                 }
             }
         }
@@ -526,13 +547,6 @@ fun ReaderScreen(
                 sheet = ReaderSheet.NONE
             }
         )
-        ReaderSheet.AI -> AiSheet(
-            selectedText = state.selection?.text.orEmpty(),
-            onTranslate = { text, lang -> viewModel.translate(text, lang) },
-            onSummarize = { text -> viewModel.summarize(text) },
-            onAsk = { question, context -> viewModel.ask(question, context) },
-            onDismiss = { sheet = ReaderSheet.NONE }
-        )
         ReaderSheet.DICTIONARY -> DictionarySheet(
             word = state.dictWord,
             entry = state.dictEntry,
@@ -544,5 +558,41 @@ fun ReaderScreen(
                 viewModel.clearDict()
             }
         )
+    }
+}
+
+/**
+ * Compact speech-rate popover anchored to the "语速" button in the reader's
+ * bottom bar. Changes apply on the next utterance via the existing
+ * LaunchedEffect(settings.ttsRate).
+ */
+@Composable
+private fun SpeedMenu(
+    expanded: Boolean,
+    rate: Float,
+    onRateChange: (Float) -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text(
+                text = "朗读语速：" + String.format("%.1f", rate) + "×",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Slider(
+                value = rate,
+                onValueChange = { onRateChange((it * 10).toInt() / 10f) },
+                valueRange = 0.5f..3f,
+                steps = 24,
+                modifier = Modifier.width(260.dp)
+            )
+            Text(
+                text = "0.5×（慢读）– 3.0×（速读），改动立即生效",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
     }
 }

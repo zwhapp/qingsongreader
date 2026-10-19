@@ -51,6 +51,7 @@ fun PdfPageView(
     page: Int,
     onTurnPage: (Int) -> Unit,
     onScaleChanged: (Float) -> Unit = {},
+    onToggleChrome: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
@@ -194,6 +195,10 @@ fun PdfPageView(
                             onTap = { offset ->
                                 if (scale <= 1f && offset.y >= size.height * 0.6f) {
                                     onTurnPage(if (offset.x >= size.width / 2f) 1 else -1)
+                                } else if (scale <= 1f && offset.y < size.height * 0.6f) {
+                                    // Tapping the page body toggles full-screen
+                                    // reading (toolbars hidden).
+                                    onToggleChrome?.invoke()
                                 }
                             },
                             onDoubleTap = {

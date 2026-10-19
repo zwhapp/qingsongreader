@@ -99,9 +99,6 @@ fun SettingsScreen(
     var browserType by remember { mutableStateOf<CloudType?>(null) }
     var davUser by remember(settings.webdavUser) { mutableStateOf(settings.webdavUser) }
     var davPass by remember(settings.webdavPassword) { mutableStateOf(settings.webdavPassword) }
-    var aiBase by remember(settings.aiBaseUrl) { mutableStateOf(settings.aiBaseUrl) }
-    var aiKey by remember(settings.aiApiKey) { mutableStateOf(settings.aiApiKey) }
-    var aiModel by remember(settings.aiModel) { mutableStateOf(settings.aiModel) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -207,7 +204,7 @@ fun SettingsScreen(
                 enabled = !reimporting
             ) { Text(if (reimporting) "导入中…" else "重新导入内置词库") }
             Text(
-                "已收录 ${dictCount} 条词条（离线词库 + 查词缓存）。查询顺序：离线词库 → 免费在线词典（英文）→ AI 释义。",
+                "已收录 ${dictCount} 条词条（离线词库 + 查词缓存）。查询顺序：离线词库 → 免费在线词典（英文）。",
                 style = MaterialTheme.typography.bodySmall
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -340,32 +337,6 @@ fun SettingsScreen(
                 }
             }
 
-            Text("AI（自带 Key）", style = MaterialTheme.typography.titleMedium)
-            OutlinedTextField(
-                value = aiBase,
-                onValueChange = { aiBase = it },
-                label = { Text("API Base URL（OpenAI 兼容）") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = aiKey,
-                onValueChange = { aiKey = it },
-                label = { Text("API Key") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = aiModel,
-                onValueChange = { aiModel = it },
-                label = { Text("模型") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            Button(onClick = {
-                viewModel.update { it.copy(aiBaseUrl = aiBase, aiApiKey = aiKey, aiModel = aiModel) }
-                scope.launch { snackbar.showSnackbar("AI 配置已保存") }
-            }) { Text("保存 AI 配置") }
 
             Text("同步（自建 WebDAV，无容量限制）", style = MaterialTheme.typography.titleMedium)
             Text(
@@ -477,7 +448,7 @@ fun SettingsScreen(
             )
 
             Text(
-                "说明：云同步与 AI 使用你自己的 WebDAV / API Key，本应用不代理任何第三方付费服务。",
+                "说明：云同步使用你自己的 WebDAV，本应用不代理任何第三方付费服务。",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(bottom = 24.dp)
             )

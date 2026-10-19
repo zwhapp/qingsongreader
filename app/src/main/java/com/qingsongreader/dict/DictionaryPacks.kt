@@ -21,12 +21,19 @@ data class DictionaryPack(
     /**
      * Candidate URLs, tried in order.
      *
-     * raw.githubusercontent.com is unreachable on many Chinese networks, which
-     * is why the jsDelivr mirror (with domestic nodes) comes first; the GitHub
-     * raw endpoints are the fallbacks.
+     * Reachability from Chinese mobile networks is volatile: raw.githubusercontent
+     * is blocked on many ISPs and cdn.jsdelivr.net's domestic nodes come and go,
+     * so we fan out across the alternative jsDelivr edges (Fastly / Gcore /
+     * Cloudflare-testingcf), then gh proxy services, then the GitHub origins.
+     * The user can always supply their own mirror prefix on top.
      */
     val urls: List<String> = listOf(
+        "https://fastly.jsdelivr.net/gh/pwxcoo/chinese-xinhua@master/data/$path",
+        "https://gcore.jsdelivr.net/gh/pwxcoo/chinese-xinhua@master/data/$path",
+        "https://testingcf.jsdelivr.net/gh/pwxcoo/chinese-xinhua@master/data/$path",
         "https://cdn.jsdelivr.net/gh/pwxcoo/chinese-xinhua@master/data/$path",
+        "https://ghproxy.net/https://raw.githubusercontent.com/pwxcoo/chinese-xinhua/master/data/$path",
+        "https://gh-proxy.com/https://raw.githubusercontent.com/pwxcoo/chinese-xinhua/master/data/$path",
         "https://raw.githubusercontent.com/pwxcoo/chinese-xinhua/master/data/$path",
         "https://github.com/pwxcoo/chinese-xinhua/raw/master/data/$path"
     )
@@ -100,7 +107,7 @@ class DictionaryDownloader(private val http: OkHttpClient) {
             onProgress(0)
         }
         return Result.failure(
-            IllegalStateException("所有下载源均不可用，请检查网络或填写镜像地址")
+            IllegalStateException("所有下载源均不可用（" + failures.joinToString("; ") + "）。请检查网络，或在镜像地址里填写可直接访问的数据目录 URL。")
         )
     }
 
