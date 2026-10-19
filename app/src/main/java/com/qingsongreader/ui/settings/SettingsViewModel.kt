@@ -12,10 +12,7 @@ import com.qingsongreader.features.update.Updater.ReleaseInfo
 import com.qingsongreader.cloud.CloudType
 import com.qingsongreader.data.prefs.ReaderSettings
 import com.qingsongreader.data.prefs.SettingsRepository
-import com.qingsongreader.dict.DictionaryDownloader
-import com.qingsongreader.dict.DictionaryPack
 import com.qingsongreader.dict.DictionaryRepository
-import com.qingsongreader.dict.PackFormat
 import com.qingsongreader.sync.ImportResult
 import com.qingsongreader.sync.SyncManager
 import com.qingsongreader.sync.WebDavSync
@@ -25,9 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 class SettingsViewModel(private val app: Application) : AndroidViewModel(app) {
 
@@ -97,13 +92,6 @@ class SettingsViewModel(private val app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ cloud
 
     val cloudManager: CloudManager = CloudManager(app)
-    val downloader = DictionaryDownloader(
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .callTimeout(600, TimeUnit.SECONDS)
-            .build()
-    )
 
     private val _cloudVersion = MutableStateFlow(0)
     val cloudVersion: StateFlow<Int> = _cloudVersion.asStateFlow()
@@ -136,22 +124,7 @@ class SettingsViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------- dict packs
 
-    /** Downloads a pack and imports it; progress 0-100 then the entry count. */
-    suspend fun downloadPack(
-        pack: DictionaryPack,
-        mirrorUrl: String? = null,
-        onProgress: (Int) -> Unit
-    ): Result<Int> {
-        val file = File(app.cacheDir, "dict_${pack.id}.${pack.format.name.lowercase()}")
-        val downloaded = downloader.download(pack, file, mirrorUrl, onProgress)
-            .getOrElse { return Result.failure(it) }
-        val result = when (pack.format) {
-            PackFormat.CSV -> dictionary.importCsv(downloaded)
-            PackFormat.JSON -> dictionary.importJsonFile(downloaded)
-        }
-        runCatching { downloaded.delete() }
-        return result
-    }
+    
 
     /**
      * Uploads the library JSON plus every book file that still exists locally.

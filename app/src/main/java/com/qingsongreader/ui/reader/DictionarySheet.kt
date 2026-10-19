@@ -26,7 +26,6 @@ fun DictionarySheet(
     entry: DictEntry?,
     loading: Boolean,
     error: String?,
-    onSpeak: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val clipboard = LocalClipboardManager.current
@@ -73,7 +72,6 @@ fun DictionarySheet(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onSpeak) { Text("朗读") }
                 TextButton(onClick = {
                     clipboard.setText(AnnotatedString(entry?.plainDefinition ?: word))
                 }) { Text("复制释义") }

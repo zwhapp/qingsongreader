@@ -49,9 +49,6 @@ import com.qingsongreader.data.prefs.ReaderSettings
 import com.qingsongreader.data.prefs.SettingsRepository
 import com.qingsongreader.data.prefs.ThemeMode
 import com.qingsongreader.data.prefs.ViewMode
-import com.qingsongreader.dict.DictionaryPacks
-import com.qingsongreader.features.FeatureGate
-import com.qingsongreader.features.PremiumFeature
 import com.qingsongreader.ui.cloud.CloudAuthSheet
 import com.qingsongreader.ui.cloud.CloudBrowserSheet
 import kotlinx.coroutines.launch
@@ -89,9 +86,6 @@ fun SettingsScreen(
     }
 
     var davUrl by remember(settings.webdavUrl) { mutableStateOf(settings.webdavUrl) }
-    var mirror by remember { mutableStateOf("") }
-    var downloading by remember { mutableStateOf<String?>(null) }
-    var downloadProgress by remember { mutableIntStateOf(0) }
     var authType by remember { mutableStateOf<CloudType?>(null) }
     var builtInReady by remember { mutableStateOf(viewModel.builtInImported()) }
     var reimporting by remember { mutableStateOf(false) }
@@ -130,7 +124,7 @@ fun SettingsScreen(
             Slider(
                 value = settings.lineHeight,
                 onValueChange = { value -> viewModel.update { it.copy(lineHeight = value) } },
-                valueRange = 1.0f..2.4f
+                valueRange = 1.0f..3.0f
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(ThemeMode.LIGHT to "明亮", ThemeMode.SEPIA to "纸色", ThemeMode.DARK to "夜间").forEach { (mode, label) ->
@@ -228,62 +222,6 @@ fun SettingsScreen(
                     selected = settings.autoLookup,
                     onClick = { viewModel.update { it.copy(autoLookup = !it.autoLookup) } },
                     label = { Text("选中即查词") }
-                )
-            }
-
-            // ------------------------------------------------ 词库中心
-            Text("词库中心（第三方开源数据包）", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "内置字表来自 Unicode® Unihan（Unicode 许可）。下面的数据包按需下载，来源与许可已标注，请自行确认后使用。",
-                style = MaterialTheme.typography.bodySmall
-            )
-            OutlinedTextField(
-                value = mirror,
-                onValueChange = { mirror = it },
-                label = { Text("镜像地址前缀（可选）") },
-                placeholder = { Text("https://你的镜像/.../data") },
-                supportingText = { Text("留空则自动依次尝试 jsDelivr、GitHub 等源") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            DictionaryPacks.presets.forEach { pack ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("${pack.label} · ${pack.sizeLabel}", style = MaterialTheme.typography.bodyMedium)
-                        Text("${pack.description} · ${pack.license}", style = MaterialTheme.typography.bodySmall)
-                    }
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                downloading = pack.id
-                                downloadProgress = 0
-                                val result = viewModel.downloadPack(
-                                    pack = pack,
-                                    mirrorUrl = mirror.trim().takeIf { it.isNotBlank() },
-                                    onProgress = { downloadProgress = it }
-                                )
-                                downloading = null
-                                snackbar.showSnackbar(
-                                    result.fold(
-                                        onSuccess = { "已导入 $it 条词条" },
-                                        onFailure = { "下载失败：${it.message}" }
-                                    )
-                                )
-                            }
-                        },
-                        enabled = downloading == null
-                    ) {
-                        Text(if (downloading == pack.id) "下载中" else "下载")
-                    }
-                }
-            }
-            if (downloading != null) {
-                LinearProgressIndicator(
-                    progress = { (downloadProgress / 100f).coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
@@ -397,18 +335,6 @@ fun SettingsScreen(
                 }) { Text("导出到剪贴板") }
             }
 
-            Text("功能状态", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "全部高级功能已解锁（本地功能，无订阅、无配额）：",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            PremiumFeature.values().forEach { feature ->
-                val enabled = FeatureGate.isEnabled(feature)
-                Text(
-                    "• ${feature.label}：${if (enabled) "已开放" else "未开放"}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
             // ------------------------------------------------ 关于与更新
             Text("关于与更新", style = MaterialTheme.typography.titleMedium)
             Text(

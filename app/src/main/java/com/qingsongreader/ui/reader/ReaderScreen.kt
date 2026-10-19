@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -61,7 +60,6 @@ import com.qingsongreader.data.prefs.ReaderSettings
 import com.qingsongreader.data.prefs.SettingsRepository
 import com.qingsongreader.data.prefs.ViewMode
 import com.qingsongreader.reader.ReaderScripts
-import com.qingsongreader.tts.TtsController
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -81,22 +79,23 @@ fun ReaderScreen(
     val state by viewModel.state.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val controller = remember { ReaderWebController() }
-    val tts = remember { TtsController(context) }
     val clipboard = LocalClipboardManager.current
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     var sheet by remember { mutableStateOf(ReaderSheet.NONE) }
     var chromeVisible by remember { mutableStateOf(true) }
-    var speedMenuVisible by remember { mutableStateOf(false) }
+    var confirmExit by remember { mutableStateOf(false) }
     var pageCount by remember { mutableIntStateOf(1) }
     var sliderValue by remember { mutableFloatStateOf(0f) }
     var dragX by remember { mutableFloatStateOf(0f) }
     var jumpToChapterEnd by remember { mutableStateOf(false) }
 
-    DisposableEffect(Unit) {
-        onDispose { tts.shutdown() }
-    }
+    DisposableEffect(Unit) { onDispose { } }
+
+    // Both the toolbar back arrow and the system back gesture route through
+    // the confirmation dialog.
+    androidx.activity.compose.BackHandler { confirmExit = true }
 
     DisposableEffect(settings.keepScreenOn) {
         if (settings.keepScreenOn) {
@@ -125,10 +124,9 @@ fun ReaderScreen(
         }
     }
 
-    // Speech rate / pitch changes take effect on the next utterance (and on an
-    // ongoing one as soon as it finishes), so the sliders feel responsive.
-    LaunchedEffect(settings.ttsRate) { tts.applyRate(settings.ttsRate) }
-    LaunchedEffect(settings.ttsPitch) { tts.applyPitch(settings.ttsPitch) }
+    // Reader brightness & eye-care: applied as a passive overlay above the
+    // content, below the toolbars.
+    val dimAlpha = ((1f - settings.brightness).coerceIn(0f, 0.85f))
 
     /** Called by the WebView once a chapter finished loading. */
     val pageLoaded = remember { mutableStateOf<() -> Unit>({}) }
@@ -260,7 +258,7 @@ fun ReaderScreen(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = { confirmExit = true }) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "返回")
                         }
                     },
@@ -320,27 +318,7 @@ fun ReaderScreen(
                             style = MaterialTheme.typography.bodySmall
                         )
                         Row {
-                            TextButton(onClick = {
-                                controller.pageText { text -> tts.speak(text, settings.ttsRate, settings.ttsPitch) }
-                            }) {
-                                Icon(Icons.Default.RecordVoiceOver, contentDescription = "朗读")
-                                Text("朗读", modifier = Modifier.padding(start = 4.dp))
-                            }
-                            TextButton(onClick = { tts.stop() }) { Text("停止") }
-                            // Speech rate is only discoverable here: the reader
-                            // adjusts it while hearing the voice, no need to dig
-                            // through the typography sheet.
-                            Box {
-                                TextButton(onClick = { speedMenuVisible = !speedMenuVisible }) {
-                                    Text("语速 " + String.format("%.1f", settings.ttsRate) + "×")
-                                }
-                                SpeedMenu(
-                                    expanded = speedMenuVisible,
-                                    rate = settings.ttsRate,
-                                    onRateChange = { next -> applySettings(settings.copy(ttsRate = next)) },
-                                    onDismiss = { speedMenuVisible = false }
-                                )
-                            }
+                            TextButton(onClick = { sheet = ReaderSheet.BRIGHTNESS }) { Text("亮度") }
                             TextButton(onClick = { viewModel.addBookmark() }) { Text("书签") }
                             TextButton(onClick = { chromeVisible = !chromeVisible }) {
                                 Text(if (chromeVisible) "沉浸" else "工具栏")
@@ -443,6 +421,23 @@ fun ReaderScreen(
                 )
             }
 
+            // Brightness dim + eye-care warm filter. Purely visual overlays
+            // without click consumers, so page taps still reach the content.
+            if (dimAlpha > 0.01f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = dimAlpha))
+                )
+            }
+            if (settings.eyeCare) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(androidx.compose.ui.graphics.Color(0xFFB8722F).copy(alpha = 0.10f))
+                )
+            }
+
             // Selection toolbar
             state.selection?.let { selection ->
                 Row(
@@ -473,9 +468,6 @@ fun ReaderScreen(
                         controller.clearSelection()
                         viewModel.setSelection(null)
                     }) { Text("复制") }
-                    TextButton(onClick = {
-                        tts.speak(selection.text, settings.ttsRate, settings.ttsPitch)
-                    }) { Text("朗读") }
                     TextButton(onClick = {
                         viewModel.lookup(selection.text)
                         sheet = ReaderSheet.DICTIONARY
@@ -552,47 +544,34 @@ fun ReaderScreen(
             entry = state.dictEntry,
             loading = state.dictLoading,
             error = state.dictError,
-            onSpeak = { tts.speak(state.dictWord, settings.ttsRate, settings.ttsPitch) },
             onDismiss = {
                 sheet = ReaderSheet.NONE
                 viewModel.clearDict()
             }
         )
+        ReaderSheet.BRIGHTNESS -> BrightnessSheet(
+            settings = settings,
+            onSettingsChange = applySettings,
+            onDismiss = { sheet = ReaderSheet.NONE }
+        )
     }
-}
 
-/**
- * Compact speech-rate popover anchored to the "语速" button in the reader's
- * bottom bar. Changes apply on the next utterance via the existing
- * LaunchedEffect(settings.ttsRate).
- */
-@Composable
-private fun SpeedMenu(
-    expanded: Boolean,
-    rate: Float,
-    onRateChange: (Float) -> Unit,
-    onDismiss: () -> Unit
-) {
-    androidx.compose.material3.DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Text(
-                text = "朗读语速：" + String.format("%.1f", rate) + "×",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Slider(
-                value = rate,
-                onValueChange = { onRateChange((it * 10).toInt() / 10f) },
-                valueRange = 0.5f..3f,
-                steps = 24,
-                modifier = Modifier.width(260.dp)
-            )
-            Text(
-                text = "0.5×（慢读）– 3.0×（速读），改动立即生效",
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
+    // Returning to the shelf is a two-step action so a stray tap on the
+    // top-left corner (or system back) does not throw the reader away.
+    if (confirmExit) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmExit = false },
+            title = { Text("退出阅读？") },
+            text = { Text("阅读进度已自动保存。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmExit = false
+                    onBack()
+                }) { Text("退出") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmExit = false }) { Text("继续阅读") }
+            }
+        )
     }
 }

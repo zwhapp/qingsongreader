@@ -30,8 +30,14 @@ data class ReaderSettings(
     val keepScreenOn: Boolean = false,
     val fullscreen: Boolean = false,
     val volumeKeysTurnPages: Boolean = true,
-    val ttsRate: Float = 1.0f,
-    val ttsPitch: Float = 1.0f,
+    /**
+     * Reader brightness overlay: 1.0 = no dimming, lower values darken the
+     * page with a black overlay (handy for night reading without leaving the
+     * app's own theme).
+     */
+    val brightness: Float = 1.0f,
+    /** Warm eye-care filter over the page content. */
+    val eyeCare: Boolean = false,
     /**
      * Look the selected word up automatically instead of via the toolbar button.
      * On by default: selecting text in EPUB/TXT pops the dictionary right away.
@@ -62,8 +68,8 @@ class SettingsRepository(private val context: Context) {
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val FULLSCREEN = booleanPreferencesKey("fullscreen")
         val VOLUME_KEYS = booleanPreferencesKey("volume_keys")
-        val TTS_RATE = floatPreferencesKey("tts_rate")
-        val TTS_PITCH = floatPreferencesKey("tts_pitch")
+        val BRIGHTNESS = floatPreferencesKey("reader_brightness")
+        val EYE_CARE = booleanPreferencesKey("eye_care")
         val AUTO_LOOKUP = booleanPreferencesKey("auto_lookup")
         val EINK_MODE = booleanPreferencesKey("eink_mode")
         val USE_SERIF = booleanPreferencesKey("use_serif")
@@ -89,8 +95,8 @@ class SettingsRepository(private val context: Context) {
             p[Keys.KEEP_SCREEN_ON] = next.keepScreenOn
             p[Keys.FULLSCREEN] = next.fullscreen
             p[Keys.VOLUME_KEYS] = next.volumeKeysTurnPages
-            p[Keys.TTS_RATE] = next.ttsRate
-            p[Keys.TTS_PITCH] = next.ttsPitch
+            p[Keys.BRIGHTNESS] = next.brightness
+            p[Keys.EYE_CARE] = next.eyeCare
             p[Keys.AUTO_LOOKUP] = next.autoLookup
             p[Keys.EINK_MODE] = next.einkMode
             p[Keys.USE_SERIF] = next.useSerif
@@ -112,7 +118,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setTextAlign(align: TextAlignSetting) = update { it.copy(textAlign = align) }
     suspend fun setKeepScreenOn(value: Boolean) = update { it.copy(keepScreenOn = value) }
     suspend fun setFullscreen(value: Boolean) = update { it.copy(fullscreen = value) }
-    suspend fun setTts(rate: Float, pitch: Float) = update { it.copy(ttsRate = rate, ttsPitch = pitch) }
+    suspend fun setBrightness(value: Float) = update { it.copy(brightness = value) }
+    suspend fun setEyeCare(value: Boolean) = update { it.copy(eyeCare = value) }
     suspend fun setWebDav(url: String, user: String, password: String) =
         update { it.copy(webdavUrl = url, webdavUser = user, webdavPassword = password) }
 
@@ -128,8 +135,8 @@ class SettingsRepository(private val context: Context) {
         keepScreenOn = p[Keys.KEEP_SCREEN_ON] ?: false,
         fullscreen = p[Keys.FULLSCREEN] ?: false,
         volumeKeysTurnPages = p[Keys.VOLUME_KEYS] ?: true,
-        ttsRate = p[Keys.TTS_RATE] ?: 1.0f,
-        ttsPitch = p[Keys.TTS_PITCH] ?: 1.0f,
+        brightness = p[Keys.BRIGHTNESS] ?: 1.0f,
+        eyeCare = p[Keys.EYE_CARE] ?: false,
         autoLookup = p[Keys.AUTO_LOOKUP] ?: true,
         einkMode = p[Keys.EINK_MODE] ?: false,
         useSerif = p[Keys.USE_SERIF] ?: false,

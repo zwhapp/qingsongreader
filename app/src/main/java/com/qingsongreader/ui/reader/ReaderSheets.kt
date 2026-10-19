@@ -43,7 +43,7 @@ import com.qingsongreader.data.repo.SearchHit
 import com.qingsongreader.reader.epub.TocEntry
 import kotlinx.coroutines.launch
 
-enum class ReaderSheet { NONE, TOC, SETTINGS, ANNOTATIONS, SEARCH, DICTIONARY }
+enum class ReaderSheet { NONE, TOC, SETTINGS, ANNOTATIONS, SEARCH, DICTIONARY, BRIGHTNESS }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,19 +161,22 @@ fun ReaderSettingsSheet(
                 )
             }
 
-            Text("朗读语速：${String.format("%.1f", settings.ttsRate)}×", style = MaterialTheme.typography.titleMedium)
+            Text("亮度：${(settings.brightness * 100).toInt()}%", style = MaterialTheme.typography.titleMedium)
             Slider(
-                value = settings.ttsRate,
-                onValueChange = { onSettingsChange(settings.copy(ttsRate = (it * 10).toInt() / 10f)) },
-                valueRange = 0.5f..2.5f,
-                steps = 19
+                value = settings.brightness,
+                onValueChange = { onSettingsChange(settings.copy(brightness = (it * 100).toInt() / 100f)) },
+                valueRange = 0.15f..1f
             )
-            Text("朗读音调：${String.format("%.1f", settings.ttsPitch)}×", style = MaterialTheme.typography.titleMedium)
-            Slider(
-                value = settings.ttsPitch,
-                onValueChange = { onSettingsChange(settings.copy(ttsPitch = (it * 10).toInt() / 10f)) },
-                valueRange = 0.5f..2.0f,
-                steps = 14
+            Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = settings.eyeCare,
+                    onClick = { onSettingsChange(settings.copy(eyeCare = !settings.eyeCare)) },
+                    label = { Text("护眼滤镜") }
+                )
+            }
+            Text(
+                "亮度调低时页面变暗，适合夜间；护眼滤镜叠加暖色调，减轻长时间阅读的视觉疲劳。",
+                style = MaterialTheme.typography.bodySmall
             )
 
             Row(modifier = Modifier.padding(bottom = 24.dp)) {
@@ -313,3 +316,44 @@ fun SearchSheet(
     }
 }
 
+
+/**
+ * Quick brightness + eye-care popover, opened from the reader's bottom bar.
+ * Both settings persist and apply as overlays above the page content.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BrightnessSheet(
+    settings: ReaderSettings,
+    onSettingsChange: (ReaderSettings) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("亮度与护眼", style = MaterialTheme.typography.titleMedium)
+            Text("亮度：${(settings.brightness * 100).toInt()}%", style = MaterialTheme.typography.titleMedium)
+            Slider(
+                value = settings.brightness,
+                onValueChange = { onSettingsChange(settings.copy(brightness = (it * 100).toInt() / 100f)) },
+                valueRange = 0.15f..1f
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = settings.eyeCare,
+                    onClick = { onSettingsChange(settings.copy(eyeCare = !settings.eyeCare)) },
+                    label = { Text("护眼滤镜") }
+                )
+            }
+            Text(
+                "亮度调低页面变暗，适合夜间；护眼滤镜叠加暖色，减轻长时间阅读的视觉疲劳。",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}

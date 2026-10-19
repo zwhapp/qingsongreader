@@ -90,7 +90,13 @@ object HtmlFactory {
     -webkit-column-fill: auto;
   }
   body.scrolled { overflow-y: auto; overflow-x: hidden; }
-  p { margin: 0 0 ${settings.paragraphSpacing}em 0; }
+  p {
+    margin: 0 0 ${settings.paragraphSpacing}em 0;
+    /* Books often ship inline line-heights; force ours so the slider has a
+       visible effect on every title. */
+    line-height: ${settings.lineHeight} !important;
+  }
+  li, div, span { line-height: inherit; }
   h1, h2, h3, h4 { line-height: 1.3; page-break-after: avoid; break-after: avoid; }
   img, svg { max-width: 100%; height: auto; }
   pre { white-space: pre-wrap; word-break: break-word; background: rgba(128,128,128,0.12); padding: 8px; border-radius: 6px; }

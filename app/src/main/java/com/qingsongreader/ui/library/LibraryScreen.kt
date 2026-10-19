@@ -84,7 +84,6 @@ fun LibraryScreen(
     var pendingDelete by remember { mutableStateOf<BookEntity?>(null) }
     var showAddPicker by remember { mutableStateOf(false) }
     var showWebdavPicker by remember { mutableStateOf(false) }
-    var showWeixinPicker by remember { mutableStateOf(false) }
     val webdavSettings by settingsRepository.settings.collectAsState(initial = null)
 
     fun reportImport(result: Result<BookEntity>) {
@@ -214,8 +213,8 @@ fun LibraryScreen(
                     }) { Text("从我的 WebDAV 导入") }
                     TextButton(onClick = {
                         showAddPicker = false
-                        showWeixinPicker = true
-                    }) { Text("从微信文件导入") }
+                        showCloudPicker = true
+                    }) { Text("从网盘导入") }
                 }
             },
             confirmButton = {
@@ -246,27 +245,6 @@ fun LibraryScreen(
                 onDismiss = { showWebdavPicker = false }
             )
         }
-    }
-
-    if (showWeixinPicker) {
-        WeixinImportSheet(
-            onImportFile = { file, name -> viewModel.importFile(file, name, ::reportImport) },
-            onPickDocument = {
-                showWeixinPicker = false
-                launcher.launch(
-                    arrayOf(
-                        "application/epub+zip",
-                        "application/pdf",
-                        "application/x-mobipocket-ebook",
-                        "application/vnd.amazon.mobi8-ebook",
-                        "text/plain",
-                        "text/markdown",
-                        "*/*"
-                    )
-                )
-            },
-            onDismiss = { showWeixinPicker = false }
-        )
     }
 
     if (showCloudPicker) {
