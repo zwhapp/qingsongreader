@@ -1,20 +1,33 @@
 package com.qingsongreader.ui.reader
 
+import android.os.Handler
+import android.os.Looper
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 
 class ReaderJsBridge(
     onLink: (String) -> Unit,
-    onSelection: (String) -> Unit
+    onSelection: (String) -> Unit,
+    onTapZone: (String) -> Unit = {}
 ) {
     private val onLinkCb = onLink
     private val onSelectionCb = onSelection
+    private val onTapZoneCb = onTapZone
+
+    // @JavascriptInterface callbacks run on the WebView's "JavaBridge" thread,
+    // but every WebView method (evaluateJavascript, …) must be called on the
+    // main thread — hop over before touching anything WebView-related.
+    private val main = Handler(Looper.getMainLooper())
 
     @JavascriptInterface
-    fun onLink(href: String) = onLinkCb(href)
+    fun onLink(href: String) = main.post { onLinkCb(href) }
 
     @JavascriptInterface
-    fun onSelection(text: String) = onSelectionCb(text)
+    fun onSelection(text: String) = main.post { onSelectionCb(text) }
+
+    /** "next" / "prev" — a tap in the bottom-right / bottom-left page area. */
+    @JavascriptInterface
+    fun onTapZone(side: String) = main.post { onTapZoneCb(side) }
 }
 
 data class SelectionRange(val start: Int, val end: Int, val text: String)

@@ -16,6 +16,7 @@ import com.qingsongreader.dict.DictionaryDownloader
 import com.qingsongreader.dict.DictionaryPack
 import com.qingsongreader.dict.DictionaryRepository
 import com.qingsongreader.dict.PackFormat
+import com.qingsongreader.sync.ImportResult
 import com.qingsongreader.sync.SyncManager
 import com.qingsongreader.sync.WebDavSync
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -96,7 +97,13 @@ class SettingsViewModel(private val app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------------ cloud
 
     val cloudManager: CloudManager = CloudManager(app)
-    val downloader = DictionaryDownloader(OkHttpClient.Builder().callTimeout(300, TimeUnit.SECONDS).build())
+    val downloader = DictionaryDownloader(
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(600, TimeUnit.SECONDS)
+            .build()
+    )
 
     private val _cloudVersion = MutableStateFlow(0)
     val cloudVersion: StateFlow<Int> = _cloudVersion.asStateFlow()
@@ -146,16 +153,46 @@ class SettingsViewModel(private val app: Application) : AndroidViewModel(app) {
         return result
     }
 
-    suspend fun syncUpload(): Result<Unit> {
+    /**
+     * Uploads the library JSON plus every book file that still exists locally.
+     * Credentials are passed explicitly so the sync never races the DataStore
+     * write the settings screen just performed.
+     */
+    suspend fun syncUpload(url: String, user: String, password: String): Result<Int> {
         val json = syncManager.exportJson()
-        return WebDavSync(settings.value).upload(SyncManager.FILE_NAME, json)
+        val dav = WebDavSync(url, user, password)
+        dav.upload(SyncManager.FILE_NAME, json).getOrElse { return Result.failure(it) }
+        var uploaded = 0
+        val failures = ArrayList<String>()
+        syncManager.bookFiles().forEach { (book, file) ->
+            dav.uploadFile(syncManager.remoteBookName(book), file)
+                .onSuccess { uploaded++ }
+                .onFailure { failures += book.title }
+        }
+        return if (failures.isNotEmpty()) {
+            Result.failure(
+                IllegalStateException(
+                    "阅读数据已上传，但 ${failures.size} 个书籍文件失败：" +
+                        failures.take(3).joinToString("、") + "…"
+                )
+            )
+        } else {
+            Result.success(uploaded)
+        }
     }
 
-    suspend fun syncDownload(): Result<Int> {
-        val json = WebDavSync(settings.value).download(SyncManager.FILE_NAME).getOrElse {
-            return Result.failure(it)
+    /**
+     * Restores the library: imports the JSON and re-downloads every book file
+     * that is missing locally. Books whose file cannot be fetched are skipped
+     * instead of being imported as broken records.
+     */
+    suspend fun syncDownload(url: String, user: String, password: String): Result<ImportResult> {
+        val dav = WebDavSync(url, user, password)
+        val json = dav.download(SyncManager.FILE_NAME).getOrElse { return Result.failure(it) }
+        return syncManager.importJson(json) { book ->
+            val local = syncManager.localBookFile(book)
+            local.exists() || dav.downloadFile(syncManager.remoteBookName(book), local).isSuccess
         }
-        return syncManager.importJson(json)
     }
 
     suspend fun exportText(): String = syncManager.exportJson()

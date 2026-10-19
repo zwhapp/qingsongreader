@@ -82,11 +82,16 @@ class ReaderViewModel(
                 return@launch
             }
             book = loaded
-            val opened = withContext(Dispatchers.IO) { repository.open(loaded) }
             // open() may self-heal the record (e.g. an EPUB wrongly stored as TXT
             // before content sniffing existed); re-read so later persist() calls
             // write the corrected format/filePath instead of the stale ones.
             book = withContext(Dispatchers.IO) { repository.get(bookId) } ?: loaded
+            val opened = runCatching {
+                withContext(Dispatchers.IO) { repository.open(book ?: loaded) }
+            }.getOrElse { error ->
+                _state.value = ReaderState(loading = false, message = "无法打开：${error.message ?: "文件缺失或已损坏"}")
+                return@launch
+            }
             content = opened
             sessionStart = System.currentTimeMillis()
             _state.value = _state.value.copy(

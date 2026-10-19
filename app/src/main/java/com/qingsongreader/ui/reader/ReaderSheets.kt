@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -87,9 +89,11 @@ fun ReaderSettingsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Text("排版", style = MaterialTheme.typography.titleLarge)
             Text("字号：${settings.fontSizeSp} sp", style = MaterialTheme.typography.titleMedium)
             Slider(
                 value = settings.fontSizeSp.toFloat(),
@@ -157,17 +161,19 @@ fun ReaderSettingsSheet(
                 )
             }
 
-            Text("朗读：语速 ${String.format("%.1f", settings.ttsRate)} / 音调 ${String.format("%.1f", settings.ttsPitch)}",
-                style = MaterialTheme.typography.titleMedium)
+            Text("朗读语速：${String.format("%.1f", settings.ttsRate)}×", style = MaterialTheme.typography.titleMedium)
             Slider(
                 value = settings.ttsRate,
-                onValueChange = { onSettingsChange(settings.copy(ttsRate = it)) },
-                valueRange = 0.5f..2.5f
+                onValueChange = { onSettingsChange(settings.copy(ttsRate = (it * 10).toInt() / 10f)) },
+                valueRange = 0.5f..2.5f,
+                steps = 19
             )
+            Text("朗读音调：${String.format("%.1f", settings.ttsPitch)}×", style = MaterialTheme.typography.titleMedium)
             Slider(
                 value = settings.ttsPitch,
-                onValueChange = { onSettingsChange(settings.copy(ttsPitch = it)) },
-                valueRange = 0.5f..2.0f
+                onValueChange = { onSettingsChange(settings.copy(ttsPitch = (it * 10).toInt() / 10f)) },
+                valueRange = 0.5f..2.0f,
+                steps = 14
             )
 
             Row(modifier = Modifier.padding(bottom = 24.dp)) {

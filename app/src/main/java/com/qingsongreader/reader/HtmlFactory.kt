@@ -64,7 +64,7 @@ object HtmlFactory {
     --gap: $gap;
     --margin: ${margin}px;
   }
-  html { height: 100%; -webkit-text-size-adjust: 100%; }
+  html { height: 100%; overflow: hidden; -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
     padding: 0 var(--margin);
@@ -79,7 +79,11 @@ object HtmlFactory {
     word-wrap: break-word;
   }
   body.paged {
-    overflow: hidden;
+    /* The body itself is the paging scroll container: the multi-column layout
+       overflows it horizontally and paging scrolls it. (Scrolling the WebView
+       viewport does not work: it expands to the content width.) */
+    overflow-x: auto;
+    overflow-y: hidden;
     column-width: var(--col-width);
     column-gap: var(--gap);
     column-fill: auto;

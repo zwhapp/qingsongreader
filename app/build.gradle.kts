@@ -13,8 +13,8 @@ android {
         applicationId = "com.qingsongreader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 5
+        versionName = "1.1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
@@ -87,4 +87,11 @@ dependencies {
 
     // JVM unit tests (run the real parsers on the host)
     testImplementation("junit:junit:4.13.2")
+
+    // Instrumented tests (multi-touch gestures on a device/emulator)
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.10.01"))
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

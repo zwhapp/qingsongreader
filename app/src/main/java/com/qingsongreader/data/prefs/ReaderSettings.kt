@@ -32,8 +32,11 @@ data class ReaderSettings(
     val volumeKeysTurnPages: Boolean = true,
     val ttsRate: Float = 1.0f,
     val ttsPitch: Float = 1.0f,
-    /** Look the selected word up automatically instead of via the toolbar button. */
-    val autoLookup: Boolean = false,
+    /**
+     * Look the selected word up automatically instead of via the toolbar button.
+     * On by default: selecting text in EPUB/TXT pops the dictionary right away.
+     */
+    val autoLookup: Boolean = true,
     /** E-ink / Kindle mode: pure black-on-white, no colour, reduced motion. */
     val einkMode: Boolean = false,
     /** Use a serif typeface (better on e-ink / paper-like screens). */
@@ -138,7 +141,7 @@ class SettingsRepository(private val context: Context) {
         volumeKeysTurnPages = p[Keys.VOLUME_KEYS] ?: true,
         ttsRate = p[Keys.TTS_RATE] ?: 1.0f,
         ttsPitch = p[Keys.TTS_PITCH] ?: 1.0f,
-        autoLookup = p[Keys.AUTO_LOOKUP] ?: false,
+        autoLookup = p[Keys.AUTO_LOOKUP] ?: true,
         einkMode = p[Keys.EINK_MODE] ?: false,
         useSerif = p[Keys.USE_SERIF] ?: false,
         autoCheckUpdate = p[Keys.AUTO_CHECK_UPDATE] ?: false,

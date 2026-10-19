@@ -78,26 +78,26 @@ object ReaderScripts {
     pageCount: function () {
       if (!isPaged()) return 1;
       var m = metrics();
-      var el = document.scrollingElement;
+      var el = document.body;
       var total = el.scrollWidth + m.gap;
       return Math.max(1, Math.round(total / (m.colW + m.gap)));
     },
     currentPage: function () {
       if (!isPaged()) return 0;
       var m = metrics();
-      return Math.max(0, Math.round(document.scrollingElement.scrollLeft / (m.colW + m.gap)));
+      return Math.max(0, Math.round(document.body.scrollLeft / (m.colW + m.gap)));
     },
     goToPage: function (i) {
       if (!isPaged()) return;
       var m = metrics();
-      document.scrollingElement.scrollLeft = i * (m.colW + m.gap);
+      document.body.scrollLeft = i * (m.colW + m.gap);
     },
     progress: function () {
       if (isPaged()) {
         var pages = window.OR.pageCount();
         return pages <= 1 ? 1 : window.OR.currentPage() / (pages - 1);
       }
-      var el = document.scrollingElement;
+      var el = document.body;
       var max = el.scrollHeight - el.clientHeight;
       return max <= 0 ? 1 : el.scrollTop / max;
     },
@@ -106,7 +106,7 @@ object ReaderScripts {
         var pages = window.OR.pageCount();
         window.OR.goToPage(Math.round(p * (pages - 1)));
       } else {
-        var el = document.scrollingElement;
+        var el = document.body;
         var max = el.scrollHeight - el.clientHeight;
         el.scrollTop = p * max;
       }
@@ -115,8 +115,8 @@ object ReaderScripts {
       if (!document.body) return;
       document.body.classList.toggle('paged', !!on);
       document.body.classList.toggle('scrolled', !on);
-      document.scrollingElement.scrollLeft = 0;
-      document.scrollingElement.scrollTop = 0;
+      document.body.scrollLeft = 0;
+      document.body.scrollTop = 0;
     },
     textLength: textLength,
     chapterText: function () {
@@ -237,6 +237,20 @@ object ReaderScripts {
       if (href.indexOf('#') === 0) return; // in-document anchor, let WebView handle it
       e.preventDefault();
       if (window.orBridge && window.orBridge.onLink) window.orBridge.onLink(href);
+      return;
+    }
+    // Tap zones: tapping the bottom-right area turns to the next page, the
+    // bottom-left area to the previous one. Only the lower part of the page,
+    // so links and body text elsewhere keep working normally.
+    // NOTE: window.innerWidth/innerHeight report the *content* size here (the
+    // layout viewport expands to the multi-column width), so the visible
+    // viewport metrics must come from visualViewport instead.
+    var h = (window.visualViewport && window.visualViewport.height) || document.body.clientHeight;
+    if (e.clientY >= h * 0.6) {
+      var w = (window.visualViewport && window.visualViewport.width) || document.body.clientWidth;
+      if (window.orBridge && window.orBridge.onTapZone) {
+        window.orBridge.onTapZone(e.clientX >= w / 2 ? 'next' : 'prev');
+      }
     }
   });
 

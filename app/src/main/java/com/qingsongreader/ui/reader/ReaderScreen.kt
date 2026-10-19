@@ -41,6 +41,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -90,6 +91,7 @@ fun ReaderScreen(
     var pageCount by remember { mutableIntStateOf(1) }
     var sliderValue by remember { mutableFloatStateOf(0f) }
     var dragX by remember { mutableFloatStateOf(0f) }
+    var jumpToChapterEnd by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) {
         onDispose { tts.shutdown() }
@@ -122,6 +124,11 @@ fun ReaderScreen(
         }
     }
 
+    // Speech rate / pitch changes take effect on the next utterance (and on an
+    // ongoing one as soon as it finishes), so the sliders feel responsive.
+    LaunchedEffect(settings.ttsRate) { tts.applyRate(settings.ttsRate) }
+    LaunchedEffect(settings.ttsPitch) { tts.applyPitch(settings.ttsPitch) }
+
     /** Called by the WebView once a chapter finished loading. */
     val pageLoaded = remember { mutableStateOf<() -> Unit>({}) }
 
@@ -143,11 +150,54 @@ fun ReaderScreen(
         }
     }
 
+    /** Moves to the previous/next chapter; shows a hint at the book boundaries. */
+    fun turnChapter(delta: Int) {
+        val target = state.chapterIndex + delta
+        if (target in 0 until state.chapterCount) {
+            // Paging backwards across a border should land on the previous
+            // chapter's last page, so the reader continues where they left off.
+            jumpToChapterEnd = delta < 0
+            viewModel.goToChapter(target)
+        } else {
+            scope.launch {
+                snackbar.showSnackbar(if (delta > 0) "已经是最后一章了" else "已经是第一章了")
+            }
+        }
+    }
+
     fun turnPage(delta: Int) {
-        controller.runJs(
-            "if (OR.pageCount() > 1) { OR.goToPage(OR.currentPage() + $delta); }" +
-                " else { window.scrollBy(0, window.innerHeight * 0.9 * $delta); }"
-        ) { refreshProgress() }
+        if (state.isPdf) {
+            // PDF: "pages" are chapters in the state model; clamp inside goToPdfPage.
+            viewModel.goToPdfPage(state.chapterIndex + delta)
+            return
+        }
+        if (settings.viewMode == ViewMode.PAGED) {
+            controller.currentPage { page ->
+                controller.pageCount { count ->
+                    if (page + delta in 0 until count) {
+                        controller.goToPage(page + delta)
+                        refreshProgress()
+                    } else {
+                        // Chapter boundary: continue into the previous/next chapter.
+                        turnChapter(delta)
+                    }
+                }
+            }
+        } else {
+            // Scrolled mode: only cross the chapter border at the very top/bottom.
+            controller.runJs(
+                "(function(){var el=document.body;var max=el.scrollHeight-el.clientHeight;" +
+                    "return (el.scrollTop<=1)?'top':((el.scrollTop>=max-1)?'bottom':'mid');})()"
+            ) { raw ->
+                val edge = raw.trim().trim('"')
+                val atEdge = (delta > 0 && edge == "bottom") || (delta < 0 && edge == "top")
+                if (atEdge) {
+                    turnChapter(delta)
+                } else {
+                    controller.runJs("document.body.scrollTop += document.body.clientHeight * 0.9 * $delta") { refreshProgress() }
+                }
+            }
+        }
     }
 
     LaunchedEffect(state.chapterIndex, state.highlights, settings.viewMode) {
@@ -157,8 +207,17 @@ fun ReaderScreen(
             viewModel.highlightsInChapter(state.chapterIndex).forEach { h ->
                 controller.highlight(h.startOffset, h.endOffset, h.color, h.id)
             }
-            if (state.pageIndex > 0) controller.goToPage(state.pageIndex)
-            refreshProgress()
+            if (jumpToChapterEnd) {
+                // Entered the previous chapter from its border: show its last page.
+                jumpToChapterEnd = false
+                controller.pageCount { count ->
+                    controller.goToPage((count - 1).coerceAtLeast(0))
+                    refreshProgress()
+                }
+            } else {
+                if (state.pageIndex > 0) controller.goToPage(state.pageIndex)
+                refreshProgress()
+            }
         }
     }
 
@@ -289,22 +348,15 @@ fun ReaderScreen(
             } else if (state.isPdf) {
                 val file = bookFile
                 if (file != null && file.exists()) {
-                    PdfPageView(
-                        file = file,
-                        page = state.chapterIndex,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectDragGestures(
-                                    onDragEnd = {
-                                        if (dragX < -80) viewModel.goToPdfPage(state.chapterIndex + 1)
-                                        else if (dragX > 80) viewModel.goToPdfPage(state.chapterIndex - 1)
-                                        dragX = 0f
-                                    },
-                                    onDrag = { _, amount -> dragX += amount.x }
-                                )
-                            }
-                    )
+                    // Keyed by page so a page turn resets zoom/pan.
+                    key(state.chapterIndex) {
+                        PdfPageView(
+                            file = file,
+                            page = state.chapterIndex,
+                            onTurnPage = { delta -> turnPage(delta) },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 } else {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("无法打开 PDF 文件")
@@ -329,6 +381,8 @@ fun ReaderScreen(
                             this.settings.useWideViewPort = true
                             this.settings.builtInZoomControls = true
                             this.settings.displayZoomControls = false
+                            this.isHorizontalScrollBarEnabled = false
+                            this.isVerticalScrollBarEnabled = false
                             this.settings.defaultTextEncodingName = "UTF-8"
                             addJavascriptInterface(
                                 ReaderJsBridge(
@@ -344,6 +398,9 @@ fun ReaderScreen(
                                                 viewModel.setSelection(range)
                                             }
                                         }
+                                    },
+                                    onTapZone = { side ->
+                                        turnPage(if (side == "next") 1 else -1)
                                     }
                                 ),
                                 ReaderScripts.BRIDGE

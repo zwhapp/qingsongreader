@@ -236,6 +236,11 @@ class BookRepository(private val context: Context) {
                 format = sniffed
             }
         }
+        // A missing file (e.g. the book was deleted, or a sync restore lost the
+        // binary) must surface as a readable error, not a raw FileNotFoundException.
+        if (!file.exists()) {
+            throw IllegalStateException("书籍文件不存在（可能已被删除或同步未完整）")
+        }
         return when (format) {
             BookFormat.EPUB -> {
                 val dir = bookDir(entity.id)

@@ -243,7 +243,9 @@ fun SettingsScreen(
             OutlinedTextField(
                 value = mirror,
                 onValueChange = { mirror = it },
-                label = { Text("镜像地址前缀（可选，下载慢时填）") },
+                label = { Text("镜像地址前缀（可选）") },
+                placeholder = { Text("https://你的镜像/.../data") },
+                supportingText = { Text("留空则自动依次尝试 jsDelivr、GitHub 等源") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -263,9 +265,7 @@ fun SettingsScreen(
                                 downloadProgress = 0
                                 val result = viewModel.downloadPack(
                                     pack = pack,
-                                    mirrorUrl = mirror.trim().takeIf { it.isNotBlank() }?.let { base ->
-                                        base.trimEnd('/') + pack.url.substringAfter("raw.githubusercontent.com")
-                                    },
+                                    mirrorUrl = mirror.trim().takeIf { it.isNotBlank() },
                                     onProgress = { downloadProgress = it }
                                 )
                                 downloading = null
@@ -368,6 +368,10 @@ fun SettingsScreen(
             }) { Text("保存 AI 配置") }
 
             Text("同步（自建 WebDAV，无容量限制）", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "上传：阅读数据（进度/批注/书签）+ 全部书籍文件。下载：恢复到本机，书籍文件会自动重新拉取。",
+                style = MaterialTheme.typography.bodySmall
+            )
             OutlinedTextField(
                 value = davUrl,
                 onValueChange = { davUrl = it },
@@ -393,15 +397,24 @@ fun SettingsScreen(
                 Button(onClick = {
                     scope.launch {
                         viewModel.update { it.copy(webdavUrl = davUrl, webdavUser = davUser, webdavPassword = davPass) }
-                        val result = viewModel.syncUpload()
-                        snackbar.showSnackbar(result.fold({ "已上传到 WebDAV" }, { "上传失败：${it.message}" }))
+                        val result = viewModel.syncUpload(davUrl, davUser, davPass)
+                        snackbar.showSnackbar(result.fold(
+                            { "已上传：阅读数据 + $it 个书籍文件" },
+                            { "上传失败：${it.message}" }
+                        ))
                     }
                 }) { Text("上传") }
                 Button(onClick = {
                     scope.launch {
                         viewModel.update { it.copy(webdavUrl = davUrl, webdavUser = davUser, webdavPassword = davPass) }
-                        val result = viewModel.syncDownload()
-                        snackbar.showSnackbar(result.fold({ "已恢复 $it 本书" }, { "下载失败：${it.message}" }))
+                        val result = viewModel.syncDownload(davUrl, davUser, davPass)
+                        snackbar.showSnackbar(result.fold(
+                            { r ->
+                                if (r.skipped > 0) "已恢复 ${r.imported} 本书（${r.skipped} 个文件缺失已跳过）"
+                                else "已恢复 ${r.imported} 本书（含书籍文件）"
+                            },
+                            { "下载失败：${it.message}" }
+                        ))
                     }
                 }) { Text("下载") }
                 Button(onClick = {

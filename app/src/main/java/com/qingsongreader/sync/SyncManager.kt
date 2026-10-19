@@ -13,7 +13,8 @@ import org.json.JSONObject
 /**
  * Exports / imports the whole library state (books + highlights + bookmarks) as
  * a single JSON document, so it can be pushed to the user's own WebDAV server
- * or saved to a file.
+ * or saved to a file. The book files themselves travel next to it (see
+ * [WebDavSync.uploadFile] / [remoteBookName]).
  */
 class SyncManager(private val context: Context) {
 
@@ -21,11 +22,34 @@ class SyncManager(private val context: Context) {
 
     companion object {
         const val FILE_NAME = "openreader-library.json"
+        const val BOOKS_DIR = "books"
     }
+
+    /** Local directory holding the imported book files. */
+    fun booksDir(): java.io.File =
+        java.io.File(context.filesDir, "books").apply { mkdirs() }
+
+    /** Expected local path of a book file inside app-private storage. */
+    fun localBookFile(book: BookEntity): java.io.File = localBookPath(book.id, book.format)
+
+    private fun localBookPath(id: String, format: String): java.io.File =
+        java.io.File(booksDir(), "$id.${format.lowercase()}")
+
+    /** Remote object name for a book file, e.g. "books/<id>.epub". */
+    fun remoteBookName(book: BookEntity): String =
+        "$BOOKS_DIR/${book.id}.${book.format.lowercase()}"
+
+    /** Every book whose file is still present on disk, paired with the file. */
+    suspend fun bookFiles(): List<Pair<BookEntity, java.io.File>> =
+        db.bookDao().all().mapNotNull { book ->
+            val file = java.io.File(book.filePath).takeIf { it.exists() } ?: localBookFile(book)
+                .takeIf { it.exists() }
+            file?.let { book to it }
+        }
 
     suspend fun exportJson(): String = withContext(Dispatchers.IO) {
         val root = JSONObject()
-        root.put("version", 1)
+        root.put("version", 2)
         root.put("exportedAt", System.currentTimeMillis())
 
         val booksArray = JSONArray()
@@ -43,29 +67,53 @@ class SyncManager(private val context: Context) {
         root.toString()
     }
 
-    suspend fun importJson(json: String): Result<Int> = withContext(Dispatchers.IO) {
+    /**
+     * Imports a library snapshot.
+     *
+     * [ensureFile] is called for every book whose local file is missing; it
+     * should try to fetch the file from the sync server and return whether the
+     * book is now readable. Books without a readable file are skipped instead
+     * of being imported as broken records (which used to crash the reader).
+     */
+    suspend fun importJson(
+        json: String,
+        ensureFile: suspend (BookEntity) -> Boolean = { false }
+    ): Result<ImportResult> = withContext(Dispatchers.IO) {
         runCatching {
             val root = JSONObject(json)
             val books = root.optJSONArray("books") ?: JSONArray()
             var count = 0
+            var skipped = 0
             for (i in 0 until books.length()) {
                 val item = books.getJSONObject(i)
-                db.bookDao().upsert(
-                    BookEntity(
-                        id = item.optString("id"),
-                        title = item.optString("title"),
-                        author = item.optString("author"),
-                        format = item.optString("format", "EPUB"),
-                        filePath = item.optString("filePath"),
-                        coverPath = item.optString("coverPath"),
-                        addedAt = item.optLong("addedAt", System.currentTimeMillis()),
-                        lastReadAt = item.optLong("lastReadAt"),
-                        chapterIndex = item.optInt("chapterIndex"),
-                        pageIndex = item.optInt("pageIndex"),
-                        progress = item.optDouble("progress").toFloat(),
-                        totalChars = item.optLong("totalChars")
-                    )
+                val localPath = localBookPath(
+                    item.optString("id"),
+                    item.optString("format", "EPUB")
                 )
+                val coverPath = item.optString("coverPath")
+                    .takeIf { it.isNotBlank() && java.io.File(it).exists() }
+                    .orEmpty()
+                val entity = BookEntity(
+                    id = item.optString("id"),
+                    title = item.optString("title"),
+                    author = item.optString("author"),
+                    format = item.optString("format", "EPUB"),
+                    // Always point at the local copy: paths from another device
+                    // or an older export may not exist here.
+                    filePath = localPath.absolutePath,
+                    coverPath = coverPath,
+                    addedAt = item.optLong("addedAt", System.currentTimeMillis()),
+                    lastReadAt = item.optLong("lastReadAt"),
+                    chapterIndex = item.optInt("chapterIndex"),
+                    pageIndex = item.optInt("pageIndex"),
+                    progress = item.optDouble("progress").toFloat(),
+                    totalChars = item.optLong("totalChars")
+                )
+                if (!localPath.exists() && !ensureFile(entity)) {
+                    skipped++
+                    continue
+                }
+                db.bookDao().upsert(entity)
                 count++
             }
 
@@ -101,10 +149,13 @@ class SyncManager(private val context: Context) {
                     )
                 )
             }
-            count
+            ImportResult(imported = count, skipped = skipped)
         }
     }
 }
+
+/** Outcome of a library import: how many books came back, how many were skipped. */
+data class ImportResult(val imported: Int, val skipped: Int)
 
 private fun BookEntity.toJson(): JSONObject = JSONObject().apply {
     put("id", id)
