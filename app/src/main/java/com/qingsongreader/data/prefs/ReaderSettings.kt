@@ -49,6 +49,12 @@ data class ReaderSettings(
     val useSerif: Boolean = false,
     /** Automatically check GitHub for updates on launch. */
     val autoCheckUpdate: Boolean = false,
+    /**
+     * Optional GitHub acceleration mirror prefix (URL-proxy style), e.g.
+     * "https://gh-proxy.com/". Empty = direct connection. Used by the
+     * in-app updater when api.github.com / github.com are unreachable.
+     */
+    val githubMirror: String = "",
     val webdavUrl: String = "",
     val webdavUser: String = "",
     val webdavPassword: String = ""
@@ -74,6 +80,7 @@ class SettingsRepository(private val context: Context) {
         val EINK_MODE = booleanPreferencesKey("eink_mode")
         val USE_SERIF = booleanPreferencesKey("use_serif")
         val AUTO_CHECK_UPDATE = booleanPreferencesKey("auto_check_update")
+        val GITHUB_MIRROR = stringPreferencesKey("github_mirror")
         val WEBDAV_URL = stringPreferencesKey("webdav_url")
         val WEBDAV_USER = stringPreferencesKey("webdav_user")
         val WEBDAV_PASSWORD = stringPreferencesKey("webdav_password")
@@ -101,6 +108,7 @@ class SettingsRepository(private val context: Context) {
             p[Keys.EINK_MODE] = next.einkMode
             p[Keys.USE_SERIF] = next.useSerif
             p[Keys.AUTO_CHECK_UPDATE] = next.autoCheckUpdate
+            p[Keys.GITHUB_MIRROR] = next.githubMirror
             p[Keys.WEBDAV_URL] = next.webdavUrl
             p[Keys.WEBDAV_USER] = next.webdavUser
             p[Keys.WEBDAV_PASSWORD] = next.webdavPassword
@@ -141,6 +149,7 @@ class SettingsRepository(private val context: Context) {
         einkMode = p[Keys.EINK_MODE] ?: false,
         useSerif = p[Keys.USE_SERIF] ?: false,
         autoCheckUpdate = p[Keys.AUTO_CHECK_UPDATE] ?: false,
+        githubMirror = p[Keys.GITHUB_MIRROR] ?: "",
         webdavUrl = p[Keys.WEBDAV_URL] ?: "",
         webdavUser = p[Keys.WEBDAV_USER] ?: "",
         webdavPassword = p[Keys.WEBDAV_PASSWORD] ?: ""

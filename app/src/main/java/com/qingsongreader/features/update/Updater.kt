@@ -39,11 +39,28 @@ object Updater {
 
     private const val RELEASES_URL =
         "https://api.github.com/repos/zwhapp/qingsongreader/releases/latest"
+    // Fallback channel when api.github.com is unreachable: the releases/latest
+    // page 302-redirects to /releases/tag/vX.Y.Z, which carries the version.
+    private const val LATEST_PAGE_URL =
+        "https://github.com/zwhapp/qingsongreader/releases/latest"
+    private const val ASSET_URL_FMT =
+        "https://github.com/zwhapp/qingsongreader/releases/download/v%s/qingsongreader-v%s-debug.apk"
     const val REPO_URL = "https://github.com/zwhapp/qingsongreader"
     private const val FILE_PROVIDER_AUTHORITY = "com.qingsongreader.fileprovider"
 
+    /**
+     * Optional acceleration mirror prefix (URL-proxy style, e.g.
+     * "https://gh-proxy.com/"). Empty = direct connection. Synced from
+     * ReaderSettings by the settings ViewModel.
+     */
+    @Volatile
+    var mirror: String = ""
+
+    private fun applyMirror(url: String): String =
+        if (mirror.isBlank()) url else mirror.trimEnd('/') + "/" + url
+
     private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
@@ -88,13 +105,16 @@ object Updater {
                         }
                 }
                 .onFailure {
-                    _state.value = UpdateState.Error(it.message ?: "检查更新失败")
+                    val hint = if (mirror.isBlank())
+                        "无法连接 GitHub，可在下方「加速镜像」中选择一个节点后重试"
+                    else "检查失败，可换一个加速镜像后重试"
+                    _state.value = UpdateState.Error("${it.message ?: "网络错误"}（$hint）")
                 }
         }
     }
 
     fun downloadAndInstall(context: Context, info: ReleaseInfo) {
-        val url = info.apkUrl ?: return
+        val url = info.apkUrl?.let { applyMirror(it) } ?: return
         scope.launch {
             _state.value = UpdateState.Downloading(0)
             downloadApk(context, info.version, url) { progress ->
@@ -113,37 +133,77 @@ object Updater {
         _state.value = UpdateState.Idle
     }
 
-    /** Latest release, or a failure if the network/API misbehaves. */
+    /**
+     * Latest release, or a failure if every channel fails.
+     *
+     * Tries two channels, each through the configured mirror when set:
+     * 1. the GitHub REST API (full release notes + asset list);
+     * 2. the releases/latest web page — its final redirect URL contains the
+     *    tag, from which the APK asset URL is constructed by convention.
+     */
     suspend fun latestRelease(): Result<ReleaseInfo> = withContext(Dispatchers.IO) {
-        runCatching {
-            val req = Request.Builder().url(RELEASES_URL)
-                .header("Accept", "application/vnd.github+json")
-                .build()
-            val resp = client.newCall(req).execute()
-            if (!resp.isSuccessful) throw IllegalStateException("GitHub API HTTP ${resp.code}")
-            val json = JSONObject(resp.body!!.string())
-            val tag = json.optString("tag_name").removePrefix("v")
-            val assets = json.optJSONArray("assets")
-            var apk: String? = null
-            for (i in 0 until (assets?.length() ?: 0)) {
-                val a = assets!!.getJSONObject(i)
-                val nm = a.optString("name", "")
-                val ct = a.optString("content_type", "")
-                if (nm.endsWith(".apk", ignoreCase = true) ||
-                    ct == "application/vnd.android.package-archive"
-                ) {
-                    apk = a.optString("browser_download_url")
-                }
+        var last: Throwable? = null
+        for (url in listOf(applyMirror(RELEASES_URL), applyMirror(LATEST_PAGE_URL))) {
+            try {
+                return@withContext Result.success(fetchRelease(url))
+            } catch (t: Throwable) {
+                last = t
             }
-            ReleaseInfo(
-                version = tag,
-                name = json.optString("name", tag),
-                body = json.optString("body", ""),
-                htmlUrl = json.optString("html_url", REPO_URL),
-                apkUrl = apk,
-                publishedAt = json.optString("published_at", "")
-            )
         }
+        Result.failure(last ?: java.io.IOException("网络错误"))
+    }
+
+    private fun fetchRelease(url: String): ReleaseInfo {
+        val req = Request.Builder().url(url)
+            .header("Accept", "application/vnd.github+json")
+            .build()
+        client.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) throw IllegalStateException("GitHub HTTP ${resp.code}")
+            val text = resp.body!!.string()
+            val info: ReleaseInfo = if (text.trimStart().startsWith("{")) {
+                parseApiJson(text)
+            } else {
+                // HTML page: derive the version from the final redirect URL.
+                val finalUrl = resp.request.url.toString()
+                val ver = Regex("/releases/tag/v?(\\d+\\.\\d+\\.\\d+)").find(finalUrl)
+                    ?.groupValues?.get(1)
+                    ?: throw IllegalStateException("未能从页面解析版本号")
+                ReleaseInfo(
+                    version = ver,
+                    name = "v$ver",
+                    body = "",
+                    htmlUrl = REPO_URL,
+                    apkUrl = String.format(ASSET_URL_FMT, ver, ver),
+                    publishedAt = ""
+                )
+            }
+            return info
+        }
+    }
+
+    private fun parseApiJson(json: String): ReleaseInfo {
+        val obj = JSONObject(json)
+        val tag = obj.optString("tag_name").removePrefix("v")
+        val assets = obj.optJSONArray("assets")
+        var apk: String? = null
+        for (i in 0 until (assets?.length() ?: 0)) {
+            val a = assets!!.getJSONObject(i)
+            val nm = a.optString("name", "")
+            val ct = a.optString("content_type", "")
+            if (nm.endsWith(".apk", ignoreCase = true) ||
+                ct == "application/vnd.android.package-archive"
+            ) {
+                apk = a.optString("browser_download_url")
+            }
+        }
+        return ReleaseInfo(
+            version = tag,
+            name = obj.optString("name", tag),
+            body = obj.optString("body", ""),
+            htmlUrl = obj.optString("html_url", REPO_URL),
+            apkUrl = apk ?: String.format(ASSET_URL_FMT, tag, tag),
+            publishedAt = obj.optString("published_at", "")
+        )
     }
 
     /** True when [remote] is a newer semantic version than [current]. */

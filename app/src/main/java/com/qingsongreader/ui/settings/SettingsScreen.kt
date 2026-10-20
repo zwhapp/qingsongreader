@@ -323,8 +323,42 @@ fun SettingsScreen(
                     )
                 else -> Unit
             }
+            // GitHub 加速镜像：直连失败时用 URL 前缀代理访问 Release。
+            var mirrorText by remember(settings.githubMirror) { mutableStateOf(settings.githubMirror) }
+            LaunchedEffect(mirrorText) {
+                if (mirrorText.trim() != settings.githubMirror) {
+                    kotlinx.coroutines.delay(600)
+                    viewModel.update { it.copy(githubMirror = mirrorText.trim()) }
+                }
+            }
+            OutlinedTextField(
+                value = mirrorText,
+                onValueChange = { mirrorText = it },
+                label = { Text("加速镜像（可选）") },
+                placeholder = { Text("留空 = 直连 GitHub") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(
+                    "" to "直连",
+                    "https://gh-proxy.com/" to "gh-proxy.com",
+                    "https://ghfast.top/" to "ghfast.top",
+                    "https://ghproxy.net/" to "ghproxy.net"
+                ).forEach { (prefix, label) ->
+                    FilterChip(
+                        selected = settings.githubMirror == prefix,
+                        onClick = {
+                            mirrorText = prefix
+                            viewModel.update { it.copy(githubMirror = prefix) }
+                        },
+                        label = { Text(label) }
+                    )
+                }
+            }
             Text(
-                "更新源：GitHub Releases（zwhapp/qingsongreader）。新版本会下载 APK 并调用系统安装器。",
+                "更新源：GitHub Releases（zwhapp/qingsongreader）。直连失败时选择或填写加速镜像" +
+                    "（格式如 https://gh-proxy.com/），新版本会下载 APK 并调用系统安装器。",
                 style = MaterialTheme.typography.bodySmall
             )
 

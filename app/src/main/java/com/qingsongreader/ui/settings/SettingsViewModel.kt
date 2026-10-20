@@ -26,6 +26,13 @@ class SettingsViewModel(private val app: Application) : AndroidViewModel(app) {
     private val syncManager = SyncManager(app)
     private val dictionary = DictionaryRepository(app)
 
+    init {
+        // Keep the updater's mirror prefix in sync with the stored setting.
+        viewModelScope.launch {
+            repository.settings.collect { Updater.mirror = it.githubMirror.trim() }
+        }
+    }
+
     val settings: StateFlow<ReaderSettings> = repository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ReaderSettings())
 

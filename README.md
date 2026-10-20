@@ -2,7 +2,7 @@
 
 安卓原生电子书阅读器。Kotlin + Jetpack Compose 编写，**本地优先、无账号、无订阅、无 AI、无任何联网服务依赖**——你读什么、读多久，只发生在你自己的设备上。
 
-当前版本：**v0.5.2**
+当前版本：**v0.5.3**
 
 ## 功能
 
@@ -31,6 +31,10 @@
 - **WebDAV 同步**：阅读进度、批注、书签与全部书籍文件同步到你自己的服务器，换机一键恢复；密码以圆点掩码显示
 - **阅读统计**：阅读时长、进度回顾
 
+### 应用内更新
+- 检查更新走 GitHub Releases，下载支持**后台进行 + 断点续传**，按版本缓存安装包
+- **加速镜像**：直连 GitHub 失败时（国内网络常见），可在「设置 → 关于与更新」中一键选择加速镜像（gh-proxy.com / ghfast.top / ghproxy.net）或自定义前缀，检查与下载都会走镜像
+
 ## 设计原则
 
 1. **本地优先**：全部功能离线可用；联网仅限你主动配置的 WebDAV / 网盘与更新检查
@@ -49,7 +53,7 @@
 
 ## 下载
 
-到 [Releases](https://github.com/zwhapp/qingsongreader/releases) 页面下载最新 APK（debug 签名，直接安装）。
+到 [Releases](https://github.com/zwhapp/qingsongreader/releases) 页面下载最新 APK（debug 签名，直接安装）。国内访问 GitHub 慢或失败时，可在任意镜像前缀后拼接完整 Release 链接下载，例如 `https://gh-proxy.com/https://github.com/zwhapp/qingsongreader/releases/...`。
 
 ## 隐私
 
