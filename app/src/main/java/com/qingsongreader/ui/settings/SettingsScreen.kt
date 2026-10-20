@@ -48,6 +48,7 @@ import com.qingsongreader.data.prefs.ReaderSettings
 import com.qingsongreader.data.prefs.SettingsRepository
 import com.qingsongreader.data.prefs.ThemeMode
 import com.qingsongreader.data.prefs.ViewMode
+import com.qingsongreader.features.update.Updater
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,7 +63,7 @@ fun SettingsScreen(
     val updateState by viewModel.updateState.collectAsState()
 
     LaunchedEffect(Unit) {
-        if (settings.autoCheckUpdate && updateState is SettingsViewModel.UpdateState.Idle) {
+        if (settings.autoCheckUpdate && updateState is Updater.UpdateState.Idle) {
             viewModel.checkForUpdate()
         }
     }
@@ -309,13 +310,13 @@ fun SettingsScreen(
                 )
             }
             when (val us = updateState) {
-                is SettingsViewModel.UpdateState.Checking ->
+                is Updater.UpdateState.Checking ->
                     Text("正在检查更新…", style = MaterialTheme.typography.bodySmall)
-                is SettingsViewModel.UpdateState.UpToDate ->
+                is Updater.UpdateState.UpToDate ->
                     Text("已是最新版本 (v${us.version})", style = MaterialTheme.typography.bodySmall)
-                is SettingsViewModel.UpdateState.Error ->
+                is Updater.UpdateState.Error ->
                     Text("更新检查出错：${us.message}", style = MaterialTheme.typography.bodySmall)
-                is SettingsViewModel.UpdateState.Downloading ->
+                is Updater.UpdateState.Downloading ->
                     LinearProgressIndicator(
                         progress = { (us.progress / 100f).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth()
@@ -337,8 +338,8 @@ fun SettingsScreen(
 
 
 
-    if (updateState is SettingsViewModel.UpdateState.Available) {
-        val info = (updateState as SettingsViewModel.UpdateState.Available).info
+    if (updateState is Updater.UpdateState.Available) {
+        val info = (updateState as Updater.UpdateState.Available).info
         AlertDialog(
             onDismissRequest = { viewModel.dismissUpdate() },
             title = { Text("发现新版本 v${info.version}") },

@@ -14,10 +14,8 @@ import com.qingsongreader.dict.DictionaryRepository
 import com.qingsongreader.sync.ImportResult
 import com.qingsongreader.sync.SyncManager
 import com.qingsongreader.sync.WebDavSync
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
@@ -31,20 +29,11 @@ class SettingsViewModel(private val app: Application) : AndroidViewModel(app) {
     val settings: StateFlow<ReaderSettings> = repository.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ReaderSettings())
 
-    /** UI state for the update checker. */
-    sealed interface UpdateState {
-        data object Idle : UpdateState
-        data object Checking : UpdateState
-        data class Available(val info: ReleaseInfo) : UpdateState
-        data class UpToDate(val version: String) : UpdateState
-        data class Downloading(val progress: Int) : UpdateState
-        data class Ready(val file: java.io.File) : UpdateState
-        data object Installed : UpdateState
-        data class Error(val message: String) : UpdateState
-    }
-
-    private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
-    val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
+    /**
+     * Update state lives in the Updater singleton so the APK download keeps
+     * running (background + resumable) no matter where the user navigates.
+     */
+    val updateState: StateFlow<Updater.UpdateState> = Updater.state
 
     val currentVersion: String get() = BuildConfig.VERSION_NAME
 
@@ -139,39 +128,9 @@ class SettingsViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------- auto-update
 
-    fun checkForUpdate() {
-        viewModelScope.launch {
-            _updateState.value = UpdateState.Checking
-            Updater.latestRelease()
-                .onSuccess { info ->
-                    if (Updater.isNewer(info.version, BuildConfig.VERSION_NAME) && info.apkUrl != null) {
-                        _updateState.value = UpdateState.Available(info)
-                    } else {
-                        _updateState.value = UpdateState.UpToDate(info.version)
-                    }
-                }
-                .onFailure {
-                    _updateState.value = UpdateState.Error(it.message ?: "检查更新失败")
-                }
-        }
-    }
+    fun checkForUpdate() = Updater.check()
 
-    fun downloadAndInstall(info: ReleaseInfo) {
-        viewModelScope.launch {
-            _updateState.value = UpdateState.Downloading(0)
-            Updater.downloadApk(app, info.apkUrl!!) { progress ->
-                _updateState.value = UpdateState.Downloading(progress)
-            }.onSuccess { file ->
-                _updateState.value = UpdateState.Ready(file)
-                Updater.installApk(app, file)
-                _updateState.value = UpdateState.Installed
-            }.onFailure {
-                _updateState.value = UpdateState.Error(it.message ?: "下载失败")
-            }
-        }
-    }
+    fun downloadAndInstall(info: ReleaseInfo) = Updater.downloadAndInstall(app, info)
 
-    fun dismissUpdate() {
-        _updateState.value = UpdateState.Idle
-    }
+    fun dismissUpdate() = Updater.reset()
 }
