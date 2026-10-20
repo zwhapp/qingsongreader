@@ -90,28 +90,25 @@ fun LibraryScreen(
         }
     }
 
-    val BOOK_MIMES = arrayOf(
-        "application/epub+zip",
-        "application/pdf",
-        "application/x-mobipocket-ebook",
-        "application/vnd.amazon.mobi8-ebook",
-        "text/plain",
-        "text/markdown",
-        "*/*"
-    )
-
-    // Local files and cloud drives share the system picker (SAF): the drawer
-    // of DocumentsUI lists every installed cloud provider (Baidu, Aliyun, ...)
-    // and Recents sorts by date, newest first.
-    val localLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    // One SAF picker for both local files and cloud drives: it starts in the
+    // local Downloads folder (EXTRA_INITIAL_URI resets any remembered
+    // location, e.g. a previous WebDAV browse), and its drawer lists every
+    // installed cloud provider (Baidu, Aliyun, ...) for one-tap switching.
+    val pickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data
         if (uri != null) viewModel.import(uri, uri.lastPathSegment, ::reportImport)
     }
 
-    // WebDAV is exposed through our own DocumentsProvider, so importing is the
-    // same SAF flow — the picker opens straight inside the user's WebDAV.
-    val webdavLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val uri = result.data?.data
-        if (uri != null) viewModel.import(uri, uri.lastPathSegment, ::reportImport)
+    val localRootUri = android.provider.DocumentsContract.buildDocumentUri(
+        "com.android.externalstorage.documents", "primary:Download"
+    )
+
+    fun safIntent(initial: Uri?): Intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = "*/*"
+        if (initial != null) {
+            putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, initial)
+        }
     }
 
     LaunchedEffect(incomingUri) {
@@ -196,7 +193,7 @@ fun LibraryScreen(
         )
     }
 
-    // "Add a book" entry: three import routes in one dialog.
+    // "Add a book" entry: two import routes in one dialog.
     if (showAddPicker) {
         AlertDialog(
             onDismissRequest = { showAddPicker = false },
@@ -205,27 +202,17 @@ fun LibraryScreen(
                 Column {
                     TextButton(onClick = {
                         showAddPicker = false
-                        localLauncher.launch(BOOK_MIMES)
-                    }) { Text("从本机导入") }
+                        pickerLauncher.launch(safIntent(localRootUri))
+                    }) { Text("从本机或网盘导入") }
+                    Text(
+                        "打开文件管理器，点左上角菜单可切换百度网盘、阿里云盘等",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
+                    )
                     TextButton(onClick = {
                         showAddPicker = false
-                        // Same system picker: its drawer lists the installed
-                        // cloud drives (Baidu, Aliyun, ...) via their own
-                        // DocumentsProviders — pick the drive at the top.
-                        localLauncher.launch(BOOK_MIMES)
-                    }) { Text("从网盘导入") }
-                    TextButton(onClick = {
-                        showAddPicker = false
-                        webdavLauncher.launch(
-                            android.content.Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                                addCategory(Intent.CATEGORY_OPENABLE)
-                                type = "*/*"
-                                putExtra(
-                                    android.provider.DocumentsContract.EXTRA_INITIAL_URI,
-                                    WebDavDocumentsProvider.rootUri()
-                                )
-                            }
-                        )
+                        pickerLauncher.launch(safIntent(WebDavDocumentsProvider.rootUri()))
                     }) { Text("从 WebDAV 导入") }
                 }
             },

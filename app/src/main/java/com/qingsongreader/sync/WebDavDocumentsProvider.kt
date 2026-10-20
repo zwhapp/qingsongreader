@@ -69,6 +69,7 @@ class WebDavDocumentsProvider : DocumentsProvider() {
         val roots = MatrixCursor(projectRoots())
         if (client() != null) {
             roots.newRow().apply {
+                add(DocumentsContract.Root.COLUMN_ROOT_ID, ROOT_DOC_ID)
                 add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, ROOT_DOC_ID)
                 add(DocumentsContract.Root.COLUMN_TITLE, "我的 WebDAV")
                 add(DocumentsContract.Root.COLUMN_MIME_TYPES, "")
@@ -129,6 +130,22 @@ class WebDavDocumentsProvider : DocumentsProvider() {
         documentId.startsWith(parentDocumentId)
 
     /**
+     * DocumentsUI calls this when an intent carries EXTRA_INITIAL_URI (our
+     * "从 WebDAV 导入" entry). Without it the launch falls back to the local
+     * storage root. Doc ids are hierarchical: webdav/Novel/book.epub.
+     */
+    override fun findDocumentPath(
+        parentDocumentId: String?,
+        documentId: String
+    ): DocumentsContract.Path {
+        val segments = documentId.removePrefix(ROOT_DOC_ID)
+            .split('/')
+            .filter { it.isNotBlank() }
+        val ids = segments.scan(ROOT_DOC_ID) { acc, part -> "$acc/$part" }
+        return DocumentsContract.Path(ROOT_DOC_ID, ids)
+    }
+
+    /**
      * Downloads the document into the cache directory, then serves it as a
      * read-only descriptor. BookRepository.import copies the stream into
      * private storage and the temp file is deleted right after.
@@ -171,6 +188,7 @@ class WebDavDocumentsProvider : DocumentsProvider() {
     }
 
     private fun projectRoots(): Array<String> = arrayOf(
+        DocumentsContract.Root.COLUMN_ROOT_ID,
         DocumentsContract.Root.COLUMN_DOCUMENT_ID,
         DocumentsContract.Root.COLUMN_TITLE,
         DocumentsContract.Root.COLUMN_MIME_TYPES,
