@@ -204,33 +204,48 @@ class WebDavSync(
         return items
     }
 
-    /** Downloads a binary file (a book) into [dest] with 0-100 progress. */
-    suspend fun downloadFile(        name: String,
+    /**
+     * Downloads a binary file (a book) into [dest] with 0-100 progress.
+     *
+     * When [resume] is true and [dest] already holds a partial download, an
+     * HTTP Range request continues from where it stopped; the server answering
+     * 200 (no range support) simply restarts from scratch.
+     */
+    suspend fun downloadFile(
+        name: String,
         dest: File,
-        onProgress: (Int) -> Unit = {}
+        onProgress: (Int) -> Unit = {},
+        resume: Boolean = false
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
             dest.parentFile?.mkdirs()
+            val already = if (resume) dest.length().coerceAtLeast(0L) else 0L
             val request = Request.Builder()
                 .url(remoteUrl(name))
                 .header("Authorization", auth())
+                .apply { if (already > 0) header("Range", "bytes=$already-") }
                 .get()
                 .build()
             client.newCall(request).execute().use { response ->
+                val ranged = response.code == 206
                 if (!response.isSuccessful) error("下载失败：HTTP ${response.code}")
                 val body = response.body ?: error("空响应")
-                val total = body.contentLength()
-                var received = 0L
+                if (already > 0 && !ranged) {
+                    // Server ignored the Range header — start over.
+                    dest.delete()
+                }
+                var received = if (ranged) already else 0L
+                val total = if (ranged) received + body.contentLength() else body.contentLength()
                 body.byteStream().use { input ->
-                    FileOutputStream(dest).use { output ->
-                        val buffer = ByteArray(64 * 1024)
+                    FileOutputStream(dest, ranged).use { output ->
+                        val buffer = ByteArray(256 * 1024)
                         while (true) {
                             val read = input.read(buffer)
                             if (read <= 0) break
                             output.write(buffer, 0, read)
                             received += read
                             if (total > 0) {
-                                onProgress(((received.toFloat() / total.toFloat()) * 100).toInt())
+                                onProgress(((received.toFloat() / total.toFloat()) * 100).toInt().coerceIn(0, 99))
                             }
                         }
                     }

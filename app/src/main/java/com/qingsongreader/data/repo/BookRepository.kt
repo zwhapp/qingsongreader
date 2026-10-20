@@ -61,17 +61,33 @@ class BookRepository(private val context: Context) {
 
     /**
      * Copies a document picked by the user into app-private storage and parses
-     * its metadata. Returns the stored [BookEntity].
+     * its metadata. Returns the stored [BookEntity]. [onProgress] reports the
+     * copied byte count and the source size (-1 when unknown).
      */
-    suspend fun import(uri: Uri, suggestedName: String? = null): BookEntity = withContext(Dispatchers.IO) {
+    suspend fun import(
+        uri: Uri,
+        suggestedName: String? = null,
+        onProgress: (Long, Long) -> Unit = { _, _ -> }
+    ): BookEntity = withContext(Dispatchers.IO) {
         val name = queryDisplayName(uri)
             ?: suggestedName?.takeIf { it.contains('.') }
             ?: uri.lastPathSegment
             ?: "book"
         val id = UUID.randomUUID().toString()
         val staging = File(booksDir(), "$id.staging")
+        val total = querySize(uri)
+        var received = 0L
         context.contentResolver.openInputStream(uri)?.use { input ->
-            FileOutputStream(staging).use { output -> input.copyTo(output) }
+            FileOutputStream(staging).use { output ->
+                val buffer = ByteArray(256 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    output.write(buffer, 0, read)
+                    received += read
+                    onProgress(received, total)
+                }
+            }
         } ?: throw IllegalArgumentException("无法读取所选文件")
         // Content sniffing wins over the name: document URIs frequently carry no
         // usable extension (e.g. content://.../document/1000054575), which used
@@ -104,6 +120,18 @@ class BookRepository(private val context: Context) {
             } else null
         }
     }.getOrNull()
+
+    /** Source size for progress reporting; -1 when unavailable. */
+    private fun querySize(uri: Uri): Long = runCatching {
+        context.contentResolver.query(
+            uri, arrayOf(OpenableColumns.SIZE), null, null, null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (index >= 0 && !cursor.isNull(index)) cursor.getLong(index) else -1L
+            } else -1L
+        } ?: -1L
+    }.getOrDefault(-1L)
 
     private fun sniffFormat(file: File): BookFormat? = runCatching {
         file.inputStream().use { input ->

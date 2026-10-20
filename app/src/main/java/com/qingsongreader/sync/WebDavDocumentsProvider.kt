@@ -9,9 +9,15 @@ import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsProvider
 import com.qingsongreader.data.prefs.SettingsRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Exposes the user's WebDAV server to the system file picker (SAF), so
@@ -146,10 +152,23 @@ class WebDavDocumentsProvider : DocumentsProvider() {
     }
 
     /**
-     * Downloads the document into the cache directory, then serves it as a
-     * read-only descriptor. BookRepository.import copies the stream into
-     * private storage and the temp file is deleted right after.
+     * Downloads happen on an application-lifetime scope, NOT on the caller's
+     * binder thread lifecycle: if the picker is dismissed or the user leaves
+     * the app, the transfer keeps running in the background and finishes into
+     * the cache. A later open of the same document reuses the cached file (or
+     * resumes the partial one through an HTTP Range request), so leaving and
+     * coming back never restarts from byte zero.
      */
+    private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val downloads = ConcurrentHashMap<String, Deferred<File>>()
+
+    /** Stable cache file for a document (kept across openDocument calls). */
+    private fun cachedFile(documentId: String): File {
+        val name = documentId.substringAfterLast('/')
+        val key = Integer.toHexString(documentId.hashCode())
+        return File(ctx.cacheDir, "saf-$key-$name")
+    }
+
     override fun openDocument(
         documentId: String,
         mode: String,
@@ -158,12 +177,33 @@ class WebDavDocumentsProvider : DocumentsProvider() {
         require(mode == "r") { "只支持读取" }
         val dav = client()
             ?: throw IllegalStateException("WebDAV 未配置：请先在设置里填写地址与账号")
-        val name = documentId.substringAfterLast('/')
-        val dest = File.createTempFile("saf-", "." + name.substringAfterLast('.', "epub"), ctx.cacheDir)
-        runBlocking { dav.downloadFile(serverPath(documentId), dest) }.getOrElse { throw IllegalStateException("下载失败：${it.message}") }
-        return ParcelFileDescriptor.open(dest, ParcelFileDescriptor.MODE_READ_ONLY).also {
-            signal?.setOnCancelListener { dest.delete() }
+        val file = cachedFile(documentId)
+        // Fully downloaded earlier — serve straight from cache.
+        if (file.exists() && file.length() > 0L) {
+            return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
         }
+        val part = File(ctx.cacheDir, file.name + ".part")
+        val job = downloads.computeIfAbsent(documentId) {
+            downloadScope.async {
+                dav.downloadFile(serverPath(documentId), part, resume = true).getOrThrow()
+                if (file.exists()) file.delete()
+                if (!part.renameTo(file)) error("缓存写入失败")
+                file
+            }
+        }
+        // Cancelling the picker must not abort the transfer: it finishes in the
+        // background and the next attempt picks up the cached result.
+        signal?.setOnCancelListener { /* keep downloading */ }
+        // Drop the finished job from the map so a failed attempt can be
+        // relaunched (and resume from the partial file).
+        job.invokeOnCompletion { downloads.remove(documentId, job) }
+        val downloaded = try {
+            runBlocking { job.await() }
+        } catch (e: Throwable) {
+            // Keep the partial file so the next attempt resumes via Range.
+            throw IllegalStateException("下载失败：${e.message}")
+        }
+        return ParcelFileDescriptor.open(downloaded, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
     // ------------------------------------------------------------------ util

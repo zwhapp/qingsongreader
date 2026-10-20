@@ -60,6 +60,7 @@ import com.qingsongreader.BuildConfig
 import coil.compose.AsyncImage
 import com.qingsongreader.data.db.BookEntity
 import com.qingsongreader.data.prefs.SettingsRepository
+import com.qingsongreader.data.repo.ImportManager
 import com.qingsongreader.sync.WebDavDocumentsProvider
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -73,6 +74,7 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = viewModel()
 ) {
     val books by viewModel.books.collectAsState()
+    val importing by ImportManager.active.collectAsState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -138,6 +140,22 @@ fun LibraryScreen(
             }
         }
     ) { padding ->
+        Column(modifier = Modifier.fillMaxSize()) {
+        // Background import progress (ImportManager survives navigation).
+        importing.forEach { task ->
+            Text(
+                if (task.percent >= 0) "正在导入《${task.name}》 ${task.percent}%"
+                else "正在导入《${task.name}》…",
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp)
+            )
+            LinearProgressIndicator(
+                progress = { if (task.percent >= 0) task.percent / 100f else 1f },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
         if (books.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -173,6 +191,7 @@ fun LibraryScreen(
                     )
                 }
             }
+        }
         }
     }
 
