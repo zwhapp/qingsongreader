@@ -6,10 +6,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.qingsongreader.BuildConfig
 import com.qingsongreader.OpenReaderApp
-import com.qingsongreader.cloud.CloudManager
 import com.qingsongreader.features.update.Updater
 import com.qingsongreader.features.update.Updater.ReleaseInfo
-import com.qingsongreader.cloud.CloudType
 import com.qingsongreader.data.prefs.ReaderSettings
 import com.qingsongreader.data.prefs.SettingsRepository
 import com.qingsongreader.dict.DictionaryRepository
@@ -90,37 +88,6 @@ class SettingsViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     // ------------------------------------------------------------------ cloud
-
-    val cloudManager: CloudManager = CloudManager(app)
-
-    private val _cloudVersion = MutableStateFlow(0)
-    val cloudVersion: StateFlow<Int> = _cloudVersion.asStateFlow()
-
-    fun cloudCredentials(type: CloudType): Pair<String, String> = cloudManager.credentials(type)
-
-    fun saveCloudCredentials(type: CloudType, id: String, secret: String) {
-        cloudManager.saveCredentials(type, id, secret)
-        _cloudVersion.value++
-    }
-
-    fun isCloudConnected(type: CloudType): Boolean = cloudManager.isConnected(type)
-
-    fun authUrl(type: CloudType): String? = cloudManager.authClient(type)?.authorizeUrl()
-
-    /** Exchanges the code from the provider's sign-in page for a token. */
-    suspend fun finishCloudAuth(type: CloudType, code: String): Result<Unit> {
-        val client = cloudManager.authClient(type)
-            ?: return Result.failure(IllegalStateException("请先填写 ${type.label} 的 AppKey/Secret"))
-        return client.exchangeToken(code).map {
-            cloudManager.saveToken(type, it)
-            _cloudVersion.value++
-        }
-    }
-
-    fun disconnectCloud(type: CloudType) {
-        cloudManager.disconnect(type)
-        _cloudVersion.value++
-    }
 
     // ------------------------------------------------------------- dict packs
 

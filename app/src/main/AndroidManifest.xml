@@ -37,6 +37,18 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Exposes the user's WebDAV to the system file picker (SAF). -->
+        <provider
+            android:name=".sync.WebDavDocumentsProvider"
+            android:authorities="com.qingsongreader.webdav.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+
         <activity
             android:name=".ui.MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|density|uiMode"

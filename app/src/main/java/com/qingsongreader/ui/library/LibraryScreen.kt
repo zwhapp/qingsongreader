@@ -1,6 +1,8 @@
 package com.qingsongreader.ui.library
 
+import android.content.Intent
 import android.net.Uri
+import java.io.File
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -21,7 +23,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -46,8 +47,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -57,12 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.qingsongreader.BuildConfig
 import coil.compose.AsyncImage
-import com.qingsongreader.cloud.CloudManager
-import com.qingsongreader.cloud.CloudType
 import com.qingsongreader.data.db.BookEntity
 import com.qingsongreader.data.prefs.SettingsRepository
-import com.qingsongreader.ui.cloud.CloudBrowserSheet
-import java.io.File
+import com.qingsongreader.sync.WebDavDocumentsProvider
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -77,14 +75,9 @@ fun LibraryScreen(
     val books by viewModel.books.collectAsState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val cloudManager = remember(context) { CloudManager(context) }
-    var cloudType by remember { mutableStateOf<CloudType?>(null) }
-    var showCloudPicker by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     var pendingDelete by remember { mutableStateOf<BookEntity?>(null) }
     var showAddPicker by remember { mutableStateOf(false) }
-    var showWebdavPicker by remember { mutableStateOf(false) }
-    val webdavSettings by settingsRepository.settings.collectAsState(initial = null)
 
     fun reportImport(result: Result<BookEntity>) {
         coroutineScope.launch {
@@ -97,7 +90,27 @@ fun LibraryScreen(
         }
     }
 
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    val BOOK_MIMES = arrayOf(
+        "application/epub+zip",
+        "application/pdf",
+        "application/x-mobipocket-ebook",
+        "application/vnd.amazon.mobi8-ebook",
+        "text/plain",
+        "text/markdown",
+        "*/*"
+    )
+
+    // Local files and cloud drives share the system picker (SAF): the drawer
+    // of DocumentsUI lists every installed cloud provider (Baidu, Aliyun, ...)
+    // and Recents sorts by date, newest first.
+    val localLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.import(uri, uri.lastPathSegment, ::reportImport)
+    }
+
+    // WebDAV is exposed through our own DocumentsProvider, so importing is the
+    // same SAF flow — the picker opens straight inside the user's WebDAV.
+    val webdavLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data
         if (uri != null) viewModel.import(uri, uri.lastPathSegment, ::reportImport)
     }
 
@@ -113,9 +126,6 @@ fun LibraryScreen(
             TopAppBar(
                 title = { Text("书架") },
                 actions = {
-                    IconButton(onClick = { showCloudPicker = true }) {
-                        Icon(Icons.Default.Cloud, contentDescription = "网盘导入")
-                    }
                     IconButton(onClick = onOpenStats) {
                         Icon(Icons.Default.BarChart, contentDescription = "统计")
                     }
@@ -195,95 +205,33 @@ fun LibraryScreen(
                 Column {
                     TextButton(onClick = {
                         showAddPicker = false
-                        launcher.launch(
-                            arrayOf(
-                                "application/epub+zip",
-                                "application/pdf",
-                                "application/x-mobipocket-ebook",
-                                "application/vnd.amazon.mobi8-ebook",
-                                "text/plain",
-                                "text/markdown",
-                                "*/*"
-                            )
-                        )
-                    }) { Text("从本地文件导入") }
+                        localLauncher.launch(BOOK_MIMES)
+                    }) { Text("从本机导入") }
                     TextButton(onClick = {
                         showAddPicker = false
-                        showWebdavPicker = true
-                    }) { Text("从我的 WebDAV 导入") }
-                    TextButton(onClick = {
-                        showAddPicker = false
-                        showCloudPicker = true
+                        // Same system picker: its drawer lists the installed
+                        // cloud drives (Baidu, Aliyun, ...) via their own
+                        // DocumentsProviders — pick the drive at the top.
+                        localLauncher.launch(BOOK_MIMES)
                     }) { Text("从网盘导入") }
+                    TextButton(onClick = {
+                        showAddPicker = false
+                        webdavLauncher.launch(
+                            android.content.Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                type = "*/*"
+                                putExtra(
+                                    android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+                                    WebDavDocumentsProvider.rootUri()
+                                )
+                            }
+                        )
+                    }) { Text("从 WebDAV 导入") }
                 }
             },
             confirmButton = {
                 TextButton(onClick = { showAddPicker = false }) { Text("取消") }
             }
-        )
-    }
-
-    if (showWebdavPicker) {
-        val dav = webdavSettings
-        if (dav == null) {
-            // settings not loaded yet — wait silently
-        } else if (dav.webdavUrl.isBlank()) {
-            AlertDialog(
-                onDismissRequest = { showWebdavPicker = false },
-                title = { Text("还没有配置 WebDAV") },
-                text = { Text("请先在「设置 → 同步」里填写你自己的 WebDAV 地址与账号，再回来导入。") },
-                confirmButton = {
-                    TextButton(onClick = { showWebdavPicker = false }) { Text("知道了") }
-                }
-            )
-        } else {
-            WebDavImportSheet(
-                url = dav.webdavUrl,
-                user = dav.webdavUser,
-                password = dav.webdavPassword,
-                onImportFile = { file, name -> viewModel.importFile(file, name, ::reportImport) },
-                onDismiss = { showWebdavPicker = false }
-            )
-        }
-    }
-
-    if (showCloudPicker) {
-        val connected = listOf(CloudType.BAIDU, CloudType.ALIYUN)
-            .filter { cloudManager.isConnected(it) }
-        AlertDialog(
-            onDismissRequest = { showCloudPicker = false },
-            title = { Text("从网盘导入") },
-            text = {
-                Column {
-                    if (connected.isEmpty()) {
-                        Text("还没有连接网盘。请在「设置 → 网盘导入」里填入你自己申请的 AppKey/Secret 并授权。")
-                    } else {
-                        connected.forEach { type ->
-                            TextButton(onClick = {
-                                showCloudPicker = false
-                                cloudType = type
-                            }) {
-                                Text("浏览 ${type.label}")
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showCloudPicker = false }) { Text("关闭") }
-            }
-        )
-    }
-
-    cloudType?.let { type ->
-        CloudBrowserSheet(
-            type = type,
-            manager = cloudManager,
-            onImported = { title ->
-                cloudType = null
-                coroutineScope.launch { snackbar.showSnackbar("已导入《$title》") }
-            },
-            onDismiss = { cloudType = null }
         )
     }
 }

@@ -97,6 +97,30 @@ fun ReaderScreen(
     // the confirmation dialog.
     androidx.activity.compose.BackHandler { confirmExit = true }
 
+    // Full-screen immersive reading: while the toolbars are hidden, the
+    // system status and navigation bars hide too (the white bands in the
+    // screenshot were the system bars rendered by the light theme). Swipe
+    // from an edge to bring them back temporarily.
+    DisposableEffect(chromeVisible) {
+        val win = activity?.window
+        if (win != null) {
+            val controller = androidx.core.view.WindowCompat.getInsetsController(win, win.decorView)
+            if (!chromeVisible) {
+                controller.systemBarsBehavior =
+                    androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            } else {
+                controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            }
+        }
+        onDispose {
+            win?.let {
+                androidx.core.view.WindowCompat.getInsetsController(it, it.decorView)
+                    .show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+
     DisposableEffect(settings.keepScreenOn) {
         if (settings.keepScreenOn) {
             activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

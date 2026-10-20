@@ -44,13 +44,10 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.qingsongreader.cloud.CloudType
 import com.qingsongreader.data.prefs.ReaderSettings
 import com.qingsongreader.data.prefs.SettingsRepository
 import com.qingsongreader.data.prefs.ThemeMode
 import com.qingsongreader.data.prefs.ViewMode
-import com.qingsongreader.ui.cloud.CloudAuthSheet
-import com.qingsongreader.ui.cloud.CloudBrowserSheet
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,7 +59,6 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsState()
     val dictCount by viewModel.dictCount.collectAsState()
-    val cloudVersion by viewModel.cloudVersion.collectAsState()
     val updateState by viewModel.updateState.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -86,13 +82,21 @@ fun SettingsScreen(
     }
 
     var davUrl by remember(settings.webdavUrl) { mutableStateOf(settings.webdavUrl) }
-    var authType by remember { mutableStateOf<CloudType?>(null) }
     var builtInReady by remember { mutableStateOf(viewModel.builtInImported()) }
     var reimporting by remember { mutableStateOf(false) }
-    var authUrl by remember { mutableStateOf<String?>(null) }
-    var browserType by remember { mutableStateOf<CloudType?>(null) }
     var davUser by remember(settings.webdavUser) { mutableStateOf(settings.webdavUser) }
     var davPass by remember(settings.webdavPassword) { mutableStateOf(settings.webdavPassword) }
+
+    // Debounce-save WebDAV credentials so "从 WebDAV 导入" (SAF DocumentsProvider)
+    // sees them without requiring an explicit 上传/下载 tap.
+    LaunchedEffect(davUrl, davUser, davPass) {
+        if (davUrl != settings.webdavUrl || davUser != settings.webdavUser || davPass != settings.webdavPassword) {
+            kotlinx.coroutines.delay(600)
+            viewModel.update {
+                it.copy(webdavUrl = davUrl.trim(), webdavUser = davUser.trim(), webdavPassword = davPass.trim())
+            }
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -225,57 +229,6 @@ fun SettingsScreen(
                 )
             }
 
-            // ------------------------------------------------ 网盘
-            Text("网盘导入", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "使用你在网盘开放平台申请的 AppKey/Secret 自行授权，凭据只保存在本机。",
-                style = MaterialTheme.typography.bodySmall
-            )
-            listOf(CloudType.BAIDU, CloudType.ALIYUN).forEach { type ->
-                val connected = remember(cloudVersion) { viewModel.isCloudConnected(type) }
-                val credentials = remember(cloudVersion) { viewModel.cloudCredentials(type) }
-                var appId by remember(type, cloudVersion) { mutableStateOf(credentials.first) }
-                var appSecret by remember(type, cloudVersion) { mutableStateOf(credentials.second) }
-
-                Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                    Text(
-                        "${type.label}：${if (connected) "已连接" else "未连接"}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    OutlinedTextField(
-                        value = appId,
-                        onValueChange = { appId = it },
-                        label = { Text(if (type == CloudType.BAIDU) "AppKey" else "App ID") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = appSecret,
-                        onValueChange = { appSecret = it },
-                        label = { Text(if (type == CloudType.BAIDU) "SecretKey" else "App Secret") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = {
-                            viewModel.saveCloudCredentials(type, appId, appSecret)
-                            val url = viewModel.authUrl(type)
-                            if (url == null) {
-                                scope.launch { snackbar.showSnackbar("请先填写 AppKey 与 Secret") }
-                            } else {
-                                authType = type
-                                authUrl = url
-                            }
-                        }) { Text("连接") }
-                        if (connected) {
-                            Button(onClick = { browserType = type }) { Text("浏览文件") }
-                            Button(onClick = { viewModel.disconnectCloud(type) }) { Text("断开") }
-                        }
-                    }
-                }
-            }
-
-
             Text("同步（自建 WebDAV，无容量限制）", style = MaterialTheme.typography.titleMedium)
             Text(
                 "上传：阅读数据（进度/批注/书签）+ 全部书籍文件。下载：恢复到本机，书籍文件会自动重新拉取。",
@@ -381,37 +334,7 @@ fun SettingsScreen(
         }
     }
 
-    authUrl?.let { url ->
-        val type = authType ?: return@let
-        CloudAuthSheet(
-            authorizeUrl = url,
-            onCode = { code ->
-                authUrl = null
-                scope.launch {
-                    val result = viewModel.finishCloudAuth(type, code)
-                    snackbar.showSnackbar(
-                        result.fold(
-                            onSuccess = { "${type.label} 已连接" },
-                            onFailure = { "授权失败：${it.message}" }
-                        )
-                    )
-                }
-            },
-            onDismiss = { authUrl = null }
-        )
-    }
 
-    browserType?.let { type ->
-        CloudBrowserSheet(
-            type = type,
-            manager = viewModel.cloudManager,
-            onImported = { title ->
-                browserType = null
-                scope.launch { snackbar.showSnackbar("已导入《$title》") }
-            },
-            onDismiss = { browserType = null }
-        )
-    }
 
     if (updateState is SettingsViewModel.UpdateState.Available) {
         val info = (updateState as SettingsViewModel.UpdateState.Available).info

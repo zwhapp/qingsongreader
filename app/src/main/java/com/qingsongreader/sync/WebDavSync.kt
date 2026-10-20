@@ -134,15 +134,14 @@ class WebDavSync(
      */
     suspend fun list(name: String): Result<List<WebDavItem>> = withContext(Dispatchers.IO) {
         runCatching {
-            val body = """<?xml version="1.0" encoding="utf-8"?>
-<D:propfind xmlns:D="DAV:">
-  <D:prop><D:resourcetype/><D:getcontentlength/></D:prop>
-</D:propfind>"""
+            // No request body = "allprop" per RFC 4918. Sending a selective
+            // propfind makes some servers emit an empty <getcontentlength/>
+            // (404 propstat) for directories, which breaks pull parsing.
             val request = Request.Builder()
                 .url(remoteUrl(name) + "/")
                 .header("Authorization", auth())
                 .header("Depth", "1")
-                .method("PROPFIND", body.toRequestBody("application/xml".toMediaType()))
+                .method("PROPFIND", null)
                 .build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful && response.code != 207) {
@@ -167,13 +166,13 @@ class WebDavSync(
         while (event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
             when (event) {
                 org.xmlpull.v1.XmlPullParser.START_TAG -> {
-                    when (parser.name.lowercase()) {
-                        "response", "d:response", "ms-response" -> {
+                    when (parser.name.lowercase().substringAfter(':')) {
+                        "response" -> {
                             currentHref = null; currentIsDir = false; currentSize = 0L
                         }
-                        "href", "d:href" -> inHref = true
-                        "collection", "d:collection" -> currentIsDir = true
-                        "getcontentlength", "d:getcontentlength" -> {
+                        "href" -> inHref = true
+                        "collection" -> currentIsDir = true
+                        "getcontentlength" -> {
                             val text = parser.nextText()
                             currentSize = text.toLongOrNull() ?: 0L
                         }
@@ -183,12 +182,14 @@ class WebDavSync(
                     if (inHref && currentHref == null) currentHref = parser.text.trim()
                 }
                 org.xmlpull.v1.XmlPullParser.END_TAG -> {
-                    when (parser.name.lowercase()) {
-                        "href", "d:href" -> inHref = false
-                        "response", "d:response", "ms-response" -> {
+                    when (parser.name.lowercase().substringAfter(':')) {
+                        "href" -> inHref = false
+                        "response" -> {
                             val href = currentHref
                             if (!href.isNullOrBlank()) {
-                                val decoded = java.net.URLDecoder.decode(href.substringAfterLast('/'), "UTF-8")
+                                // Collection hrefs end with '/'; strip it before
+                                // taking the last segment, or folders vanish.
+                                val decoded = java.net.URLDecoder.decode(href.trimEnd('/').substringAfterLast('/'), "UTF-8")
                                 if (decoded.isNotBlank()) {
                                     items += WebDavItem(decoded, currentIsDir, currentSize)
                                 }
