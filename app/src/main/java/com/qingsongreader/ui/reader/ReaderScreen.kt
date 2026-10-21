@@ -13,10 +13,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmarks
@@ -32,6 +35,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -84,7 +88,9 @@ fun ReaderScreen(
     val scope = rememberCoroutineScope()
 
     var sheet by remember { mutableStateOf(ReaderSheet.NONE) }
-    var chromeVisible by remember { mutableStateOf(true) }
+    // Open books in distraction-free immersive mode by default; a tap on the
+    // page centre brings the floating toolbars back.
+    var chromeVisible by remember { mutableStateOf(false) }
     var confirmExit by remember { mutableStateOf(false) }
     var pageCount by remember { mutableIntStateOf(1) }
     var sliderValue by remember { mutableFloatStateOf(0f) }
@@ -92,6 +98,38 @@ fun ReaderScreen(
     var jumpToChapterEnd by remember { mutableStateOf(false) }
 
     DisposableEffect(Unit) { onDispose { } }
+
+    // Edge-to-edge while reading: the window always spans the whole screen,
+    // so hiding/showing the system bars or the toolbars never reflows the
+    // content — pagination and reading progress stay byte-identical. The
+    // bar colours go transparent so no black band remains while immersed.
+    DisposableEffect(Unit) {
+        val win = activity?.window
+        val oldStatus = win?.statusBarColor
+        val oldNav = win?.navigationBarColor
+        win?.let {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(it, false)
+            it.statusBarColor = android.graphics.Color.TRANSPARENT
+            it.navigationBarColor = android.graphics.Color.TRANSPARENT
+            // Let the window extend into the camera cutout while immersed,
+            // otherwise the system letterboxes that area in black.
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                it.attributes.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        onDispose {
+            win?.let {
+                androidx.core.view.WindowCompat.setDecorFitsSystemWindows(it, true)
+                oldStatus?.let { c -> it.statusBarColor = c }
+                oldNav?.let { c -> it.navigationBarColor = c }
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    it.attributes.layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+                }
+            }
+        }
+    }
 
     // Both the toolbar back arrow and the system back gesture route through
     // the confirmation dialog.
@@ -271,86 +309,9 @@ fun ReaderScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            if (chromeVisible) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = state.title.ifBlank { "阅读" },
-                            maxLines = 1,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = { confirmExit = true }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "返回")
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { sheet = ReaderSheet.TOC }) {
-                            Icon(Icons.Default.List, contentDescription = "目录")
-                        }
-                        IconButton(onClick = { sheet = ReaderSheet.SEARCH }) {
-                            Icon(Icons.Default.Search, contentDescription = "搜索")
-                        }
-                        IconButton(onClick = { sheet = ReaderSheet.ANNOTATIONS }) {
-                            Icon(Icons.Default.Bookmarks, contentDescription = "批注")
-                        }
-                        IconButton(onClick = { sheet = ReaderSheet.SETTINGS }) {
-                            Icon(Icons.Default.FormatSize, contentDescription = "排版")
-                        }
-                    }
-                )
-            }
-        },
-        bottomBar = {
-            // Full-screen reading: tapping the page centre hides both bars;
-            // the toolbar-toggle text below restores them.
-            if (chromeVisible) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = { turnPage(-1) }) { Text("上一页") }
-                        Slider(
-                            value = sliderValue,
-                            onValueChange = { sliderValue = it },
-                            onValueChangeFinished = {
-                                val target = sliderValue.coerceIn(0f, 1f)
-                                if (state.isPdf) {
-                                    viewModel.goToPdfPage((target * state.chapterCount).toInt().coerceIn(0, state.chapterCount - 1))
-                                } else {
-                                    val chapter = (target * state.chapterCount).toInt()
-                                        .coerceIn(0, (state.chapterCount - 1).coerceAtLeast(0))
-                                    if (chapter != state.chapterIndex) viewModel.goToChapter(chapter)
-                                    else controller.goToProgress(target * state.chapterCount - chapter)
-                                }
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = { turnPage(1) }) { Text("下一页") }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = if (state.isPdf) "第 ${state.chapterIndex + 1} / ${state.chapterCount} 页"
-                            else "第 ${state.chapterIndex + 1} / ${state.chapterCount} 章",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "${(state.progress * 100).toInt()}%",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Row {
-                            TextButton(onClick = { sheet = ReaderSheet.BRIGHTNESS }) { Text("亮度") }
-                            TextButton(onClick = { viewModel.addBookmark() }) { Text("书签") }
-                            TextButton(onClick = { chromeVisible = !chromeVisible }) {
-                                Text(if (chromeVisible) "沉浸" else "工具栏")
-                            }                        }
-                    }
-                }
-            }
-            }
+        // Toolbars are drawn as overlays inside the content Box below; the
+        // content itself always fills the whole screen (stable pagination).
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Box(
             modifier = Modifier
@@ -460,6 +421,97 @@ fun ReaderScreen(
                         .fillMaxSize()
                         .background(androidx.compose.ui.graphics.Color(0xFFB8722F).copy(alpha = 0.10f))
                 )
+            }
+
+            // Floating chrome: both toolbars overlay the text instead of
+            // squeezing it, so toggling them never changes the layout.
+            if (chromeVisible) {
+                TopAppBar(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth(),
+                    title = {
+                        Text(
+                            text = state.title.ifBlank { "阅读" },
+                            maxLines = 1,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { confirmExit = true }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { sheet = ReaderSheet.TOC }) {
+                            Icon(Icons.Default.List, contentDescription = "目录")
+                        }
+                        IconButton(onClick = { sheet = ReaderSheet.SEARCH }) {
+                            Icon(Icons.Default.Search, contentDescription = "搜索")
+                        }
+                        IconButton(onClick = { sheet = ReaderSheet.ANNOTATIONS }) {
+                            Icon(Icons.Default.Bookmarks, contentDescription = "批注")
+                        }
+                        IconButton(onClick = { sheet = ReaderSheet.SETTINGS }) {
+                            Icon(Icons.Default.FormatSize, contentDescription = "排版")
+                        }
+                    }
+                )
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth(),
+                    tonalElevation = 3.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { turnPage(-1) }) { Text("上一页") }
+                            Slider(
+                                value = sliderValue,
+                                onValueChange = { sliderValue = it },
+                                onValueChangeFinished = {
+                                    val target = sliderValue.coerceIn(0f, 1f)
+                                    if (state.isPdf) {
+                                        viewModel.goToPdfPage((target * state.chapterCount).toInt().coerceIn(0, state.chapterCount - 1))
+                                    } else {
+                                        val chapter = (target * state.chapterCount).toInt()
+                                            .coerceIn(0, (state.chapterCount - 1).coerceAtLeast(0))
+                                        if (chapter != state.chapterIndex) viewModel.goToChapter(chapter)
+                                        else controller.goToProgress(target * state.chapterCount - chapter)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = { turnPage(1) }) { Text("下一页") }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (state.isPdf) "第 ${state.chapterIndex + 1} / ${state.chapterCount} 页"
+                                else "第 ${state.chapterIndex + 1} / ${state.chapterCount} 章",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = "${(state.progress * 100).toInt()}%",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Row {
+                                TextButton(onClick = { sheet = ReaderSheet.BRIGHTNESS }) { Text("亮度") }
+                                TextButton(onClick = { viewModel.addBookmark() }) { Text("书签") }
+                                TextButton(onClick = { chromeVisible = !chromeVisible }) {
+                                    Text(if (chromeVisible) "沉浸" else "工具栏")
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Selection toolbar
