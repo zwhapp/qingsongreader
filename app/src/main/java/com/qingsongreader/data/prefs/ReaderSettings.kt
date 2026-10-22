@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -55,6 +56,10 @@ data class ReaderSettings(
      * in-app updater when api.github.com / github.com are unreachable.
      */
     val githubMirror: String = "",
+    /** Baidu Netdisk OAuth tokens (cloud import). Empty = not authorized. */
+    val baiduAccessToken: String = "",
+    val baiduRefreshToken: String = "",
+    val baiduTokenExpiresMs: Long = 0L,
     val webdavUrl: String = "",
     val webdavUser: String = "",
     val webdavPassword: String = ""
@@ -81,6 +86,9 @@ class SettingsRepository(private val context: Context) {
         val USE_SERIF = booleanPreferencesKey("use_serif")
         val AUTO_CHECK_UPDATE = booleanPreferencesKey("auto_check_update")
         val GITHUB_MIRROR = stringPreferencesKey("github_mirror")
+        val BAIDU_ACCESS = stringPreferencesKey("baidu_access_token")
+        val BAIDU_REFRESH = stringPreferencesKey("baidu_refresh_token")
+        val BAIDU_EXPIRES = longPreferencesKey("baidu_token_expires_ms")
         val WEBDAV_URL = stringPreferencesKey("webdav_url")
         val WEBDAV_USER = stringPreferencesKey("webdav_user")
         val WEBDAV_PASSWORD = stringPreferencesKey("webdav_password")
@@ -109,6 +117,9 @@ class SettingsRepository(private val context: Context) {
             p[Keys.USE_SERIF] = next.useSerif
             p[Keys.AUTO_CHECK_UPDATE] = next.autoCheckUpdate
             p[Keys.GITHUB_MIRROR] = next.githubMirror
+            p[Keys.BAIDU_ACCESS] = next.baiduAccessToken
+            p[Keys.BAIDU_REFRESH] = next.baiduRefreshToken
+            p[Keys.BAIDU_EXPIRES] = next.baiduTokenExpiresMs
             p[Keys.WEBDAV_URL] = next.webdavUrl
             p[Keys.WEBDAV_USER] = next.webdavUser
             p[Keys.WEBDAV_PASSWORD] = next.webdavPassword
@@ -150,6 +161,9 @@ class SettingsRepository(private val context: Context) {
         useSerif = p[Keys.USE_SERIF] ?: false,
         autoCheckUpdate = p[Keys.AUTO_CHECK_UPDATE] ?: false,
         githubMirror = p[Keys.GITHUB_MIRROR] ?: "",
+        baiduAccessToken = p[Keys.BAIDU_ACCESS] ?: "",
+        baiduRefreshToken = p[Keys.BAIDU_REFRESH] ?: "",
+        baiduTokenExpiresMs = p[Keys.BAIDU_EXPIRES] ?: 0L,
         webdavUrl = p[Keys.WEBDAV_URL] ?: "",
         webdavUser = p[Keys.WEBDAV_USER] ?: "",
         webdavPassword = p[Keys.WEBDAV_PASSWORD] ?: ""

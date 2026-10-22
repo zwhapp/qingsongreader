@@ -212,44 +212,22 @@ fun LibraryScreen(
         )
     }
 
-    // "Add a book" entry: local / cloud-drive / WebDAV import routes.
-    var cloudChoices by remember { mutableStateOf<List<Pair<String, Uri>>?>(null) }
+    // "Add a book" entry: local / Baidu-Netdisk OAuth / WebDAV import routes.
+    var showCloudImport by remember { mutableStateOf(false) }
 
-    // Discovers every installed cloud drive that publishes a SAF documents
-    // provider (Baidu Netdisk, Aliyun Drive, ...). Local storage / downloads /
-    // media providers and our own WebDAV provider are excluded.
-    fun probeCloudRoots(): List<Pair<String, Uri>> {
-        val pm = context.packageManager
-        val providers = runCatching {
-            pm.queryIntentContentProviders(Intent("android.content.action.DOCUMENTS_PROVIDER"), 0)
-        }.getOrNull() ?: return emptyList()
-        val local = setOf(
-            "com.android.externalstorage.documents",
-            "com.android.providers.downloads.documents",
-            "com.android.providers.media.documents",
-            "com.android.mtp.documents"
+    if (showCloudImport) {
+        BaiduPanImportDialog(
+            settings = settingsRepository.settings.collectAsState(
+                initial = com.qingsongreader.data.prefs.ReaderSettings()
+            ).value,
+            onSettingsChange = { mutate ->
+                coroutineScope.launch { settingsRepository.update(mutate) }
+            },
+            onImportFile = { file, name, onResult ->
+                viewModel.importFile(file, name, onResult)
+            },
+            onDismiss = { showCloudImport = false }
         )
-        val out = mutableListOf<Pair<String, Uri>>()
-        for (info in providers) {
-            val authority = info.providerInfo?.authority ?: continue
-            if (authority in local || authority.startsWith("com.qingsongreader")) continue
-            runCatching {
-                context.contentResolver.query(
-                    android.provider.DocumentsContract.buildRootsUri(authority),
-                    null, null, null, null
-                )?.use { c ->
-                    val titleIdx = c.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_TITLE)
-                    val docIdIdx = c.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_DOCUMENT_ID)
-                    while (c.moveToNext()) {
-                        val docId = if (docIdIdx >= 0) c.getString(docIdIdx) else null
-                        if (docId.isNullOrBlank()) continue
-                        val title = if (titleIdx >= 0) (c.getString(titleIdx) ?: authority) else authority
-                        out += title to android.provider.DocumentsContract.buildDocumentUri(authority, docId)
-                    }
-                }
-            }
-        }
-        return out
     }
 
     if (showAddPicker) {
@@ -261,29 +239,19 @@ fun LibraryScreen(
                     TextButton(onClick = {
                         showAddPicker = false
                         pickerLauncher.launch(safIntent(localRootUri))
-                    }) { Text("从本机或网盘导入") }
+                    }) { Text("从本机导入") }
                     Text(
-                        "打开文件管理器，点左上角菜单可切换百度网盘、阿里云盘等",
+                        "打开文件管理器，从手机存储中选择 EPUB / PDF 等文件",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
                     )
                     TextButton(onClick = {
                         showAddPicker = false
-                        coroutineScope.launch {
-                            val roots = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { probeCloudRoots() }
-                            when {
-                                roots.isEmpty() -> {
-                                    pickerLauncher.launch(safIntent(localRootUri))
-                                    snackbar.showSnackbar("未检测到已接入系统的网盘；请先安装并登录网盘 App（如百度网盘）再试")
-                                }
-                                roots.size == 1 -> pickerLauncher.launch(safIntent(roots[0].second))
-                                else -> cloudChoices = roots
-                            }
-                        }
+                        showCloudImport = true
                     }) { Text("从网盘导入") }
                     Text(
-                        "自动识别手机里已接入系统的网盘，选择后直接进入网盘目录挑选文件",
+                        "登录百度网盘授权后，直接选择网盘里的书籍文件（无需填写任何密钥）",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
@@ -296,27 +264,6 @@ fun LibraryScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showAddPicker = false }) { Text("取消") }
-            }
-        )
-    }
-
-    // Picking between several installed cloud drives.
-    cloudChoices?.let { roots ->
-        AlertDialog(
-            onDismissRequest = { cloudChoices = null },
-            title = { Text("选择网盘") },
-            text = {
-                Column {
-                    roots.forEach { (title, uri) ->
-                        TextButton(onClick = {
-                            cloudChoices = null
-                            pickerLauncher.launch(safIntent(uri))
-                        }) { Text(title) }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { cloudChoices = null }) { Text("取消") }
             }
         )
     }

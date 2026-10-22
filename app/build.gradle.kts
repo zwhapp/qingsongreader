@@ -13,10 +13,26 @@ android {
         applicationId = "com.qingsongreader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 12
-        versionName = "0.5.4"
+        versionCode = 13
+        versionName = "0.5.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+
+        // Baidu Netdisk OpenAPI (pan.baidu.com/union) developer credentials.
+        // Built into the app so end users only ever see the authorize page;
+        // override via gradle.properties (BAIDU_APP_KEY / BAIDU_APP_SECRET).
+        buildConfigField(
+            "String", "BAIDU_APP_KEY",
+            "\"${project.findProperty("BAIDU_APP_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "BAIDU_APP_SECRET",
+            "\"${project.findProperty("BAIDU_APP_SECRET") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "BAIDU_APP_NAME",
+            "\"${project.findProperty("BAIDU_APP_NAME") ?: "轻松阅读"}\""
+        )
     }
 
     buildTypes {
