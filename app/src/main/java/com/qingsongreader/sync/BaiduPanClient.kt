@@ -30,7 +30,7 @@ object BaiduPanClient {
     const val APP_KEY: String = BuildConfig.BAIDU_APP_KEY
     const val APP_SECRET: String = BuildConfig.BAIDU_APP_SECRET
     const val APP_NAME: String = BuildConfig.BAIDU_APP_NAME
-    /** The only directory the app may legally read, e.g. /apps/轻松阅读. */
+    /** The only directory the app may legally read, e.g. /apps/个人阅读. */
     const val APP_DIR: String = "/apps/$APP_NAME"
 
     private const val AUTHORIZE = "https://openapi.baidu.com/oauth/2.0/authorize"
@@ -51,9 +51,26 @@ object BaiduPanClient {
 
     fun configured(): Boolean = APP_KEY.isNotBlank() && APP_SECRET.isNotBlank()
 
-    fun authorizeUrl(): String =
+    /**
+     * Builds the authorize URL. `display=page` renders the full-page login,
+     * which includes a QR-code tab (scan with the Baidu app to sign in);
+     * `display=mobile` renders the touch-optimized account/password form.
+     */
+    fun authorizeUrl(display: String = "page"): String =
         "$AUTHORIZE?response_type=code&client_id=$APP_KEY&redirect_uri=oob" +
-            "&scope=basic,netdisk&display=mobile"
+            "&scope=basic,netdisk&display=$display"
+
+    /**
+     * QR-code sign-in entry. Baidu's OAuth authorize page ships with QR login
+     * disabled server-side (`qrcode: ''`), but the passport login page itself
+     * has it enabled for desktop user agents. Signing in there and returning
+     * to [authorizeUrl] via the `u` redirect lands on the consent page with a
+     * live session, so the user only has to tap 授权.
+     */
+    fun qrLoginUrl(): String {
+        val back = authorizeUrl("page")
+        return "https://passport.baidu.com/v2/?login&u=" + URLEncoder.encode(back, "UTF-8")
+    }
 
     /** Extracts an oob authorization code from the consent page text or URL. */
     fun extractCode(pageText: String): String? {

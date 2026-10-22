@@ -122,6 +122,13 @@ def parse_date(iso):
 
 
 def get_blob_bytes(sha):
+    # Prefer the local object store: it already holds every blob of the working
+    # tree, so reconciliation (reconstruct) never has to pull multi-MB assets
+    # over a flaky proxy (which truncates large GETs with IncompleteRead).
+    try:
+        return git("cat-file", "blob", sha)
+    except Exception:
+        pass
     info = api_get("/repos/%s/git/blobs/%s" % (REPO, sha))
     content = info.get("content", "")
     encoding = info.get("encoding", "base64")
