@@ -23,8 +23,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -92,10 +92,10 @@ fun LibraryScreen(
         }
     }
 
-    // One SAF picker for both local files and cloud drives: it starts in the
-    // local Downloads folder (EXTRA_INITIAL_URI resets any remembered
-    // location, e.g. a previous WebDAV browse), and its drawer lists every
-    // installed cloud provider (Baidu, Aliyun, ...) for one-tap switching.
+    // One SAF picker for local files and system-registered cloud providers: it
+    // starts in the local Downloads folder (EXTRA_INITIAL_URI resets any
+    // remembered location, e.g. a previous WebDAV browse), and its drawer lists
+    // every cloud provider the device has installed for one-tap switching.
     val pickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val uri = result.data?.data
         if (uri != null) viewModel.import(uri, uri.lastPathSegment, ::reportImport)
@@ -162,7 +162,7 @@ fun LibraryScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.height(64.dp))
+                    Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.height(64.dp))
                     Text(
                         "书架空空，点右下角导入 EPUB / PDF / TXT / MD",
                         modifier = Modifier.padding(top = 12.dp),
@@ -294,7 +294,7 @@ private fun BookCard(book: BookEntity, onClick: () -> Unit, onLongClick: () -> U
                     )
                 } else {
                     Icon(
-                        Icons.Default.MenuBook,
+                        Icons.AutoMirrored.Filled.MenuBook,
                         contentDescription = null,
                         modifier = Modifier.height(56.dp),
                         tint = MaterialTheme.colorScheme.primary

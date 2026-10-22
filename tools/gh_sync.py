@@ -234,8 +234,17 @@ def blob_exists(sha):
     try:
         api_get("/repos/%s/git/blobs/%s" % (REPO, sha))
         return True
-    except urllib.error.HTTPError:
-        return False
+    except urllib.error.HTTPError as e:
+        # 404 = definitely absent -> caller must upload it.
+        if e.code == 404:
+            return False
+        # Any other HTTP status: assume it exists (don't force a re-upload
+        # of a large existing blob, which can fail over a flaky proxy).
+        return True
+    except Exception:
+        # Network truncation (e.g. IncompleteRead) on an existing large blob:
+        # treat as present so we skip the re-upload rather than fail the push.
+        return True
 
 
 def cmd_push(message):
