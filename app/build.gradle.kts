@@ -1,9 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+
+// Baidu Netdisk OpenAPI credentials live in local.properties (git-ignored):
+//   BAIDU_APP_KEY / BAIDU_APP_SECRET / BAIDU_APP_NAME
+val baiduProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun baiduProp(name: String, fallback: String): String =
+    project.findProperty(name) as String? ?: baiduProps.getProperty(name) ?: fallback
 
 android {
     namespace = "com.qingsongreader"
@@ -19,20 +30,10 @@ android {
         vectorDrawables.useSupportLibrary = true
 
         // Baidu Netdisk OpenAPI (pan.baidu.com/union) developer credentials.
-        // Built into the app so end users only ever see the authorize page;
-        // override via gradle.properties (BAIDU_APP_KEY / BAIDU_APP_SECRET).
-        buildConfigField(
-            "String", "BAIDU_APP_KEY",
-            "\"${project.findProperty("BAIDU_APP_KEY") ?: ""}\""
-        )
-        buildConfigField(
-            "String", "BAIDU_APP_SECRET",
-            "\"${project.findProperty("BAIDU_APP_SECRET") ?: ""}\""
-        )
-        buildConfigField(
-            "String", "BAIDU_APP_NAME",
-            "\"${project.findProperty("BAIDU_APP_NAME") ?: "轻松阅读"}\""
-        )
+        // Built into the app so end users only ever see the authorize page.
+        buildConfigField("String", "BAIDU_APP_KEY", "\"${baiduProp("BAIDU_APP_KEY", "")}\"")
+        buildConfigField("String", "BAIDU_APP_SECRET", "\"${baiduProp("BAIDU_APP_SECRET", "")}\"")
+        buildConfigField("String", "BAIDU_APP_NAME", "\"${baiduProp("BAIDU_APP_NAME", "个人阅读")}\"")
     }
 
     buildTypes {

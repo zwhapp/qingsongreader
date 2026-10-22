@@ -187,8 +187,8 @@ fun BaiduPanImportDialog(
             ) {
                 Text("从网盘导入", style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "仅访问网盘「我的应用数据/${BaiduPanClient.APP_NAME}」目录（${BaiduPanClient.APP_DIR}），" +
-                        "不会读取网盘中的其他任何文件。",
+                    "请把书籍存放在百度网盘 /apps（我的应用数据）/${BaiduPanClient.APP_NAME} 目录下。" +
+                        "应用仅能调取该目录内的文件，不会读取网盘中的其他任何内容。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -265,8 +265,8 @@ fun BaiduPanImportDialog(
                             } else if (list.isEmpty()) {
                                 Text(
                                     if (message != null) "读取失败：$message"
-                                    else "该目录还没有书籍文件。请先把书上传到网盘" +
-                                        "「我的应用数据/${BaiduPanClient.APP_NAME}」目录，再点刷新。",
+                                    else "该目录还没有书籍文件。请把书上传到百度网盘" +
+                                        " /apps（我的应用数据）/${BaiduPanClient.APP_NAME} 目录后点刷新。",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             } else {
