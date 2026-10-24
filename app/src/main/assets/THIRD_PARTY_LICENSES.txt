@@ -25,7 +25,9 @@ THIRD-PARTY-NOTICES.md。
 
 合规要点
 --------
-- 无硬编码密钥 / 凭证：所有云端与 AI 凭据均由用户自行填写，仅存于本机。
+- 无硬编码私密密钥：百度网盘开放平台的 AppKey / Secret 是公开客户端标识
+  （等同于网页登录的 client_id，OAuth 公开客户端的常规做法），在构建期内置于
+  安装包；用户的 access / refresh token 仅存储于本机 DataStore。
 - 付费能力以「用户自带 Key / 自建 WebDAV」方式提供，未绕过任何服务端鉴权或 DRM。
-- 应用名 OpenReader，未使用 Readest 商标或标识。
+- 应用名 OpenReader（发行名「轻松阅读」），未使用 Readest 商标或标识。
 - 不收集、不上传用户书库内容。隐私说明见仓库 PRIVACY.md。

@@ -21,7 +21,7 @@ AGPL-3.0 提供；如你分发本应用的二进制（APK），须按 AGPL-3.0 �
 
 | 数据 | 许可证 | 来源 / 署名 |
 | --- | --- | --- |
-| CC-CEDICT 汉英/英汉词典 (`assets/dict/cedict.tsv`, 约 15.5 万条) | CC BY-SA 4.0 | CC-CEDICT 项目（维护者：various，原站 mdbg.net）。完整许可见 `assets/dict/CC-CEDICT-LICENSE.txt` |
+| CC-CEDICT 汉英/英汉词典 (`assets/dict/cedict.tsv`，约 15.5 万条，其中约 11.4 万中文词条 + 约 4 万英文词条反向索引) | CC BY-SA 4.0 | CC-CEDICT 项目（维护者：various，原站 mdbg.net）。完整许可见 `assets/dict/CC-CEDICT-LICENSE.txt` |
 | Unihan 汉字表 (`assets/dict/hanzi_basic.json`, 6739 字) | Unicode Data Files License | 派生自 Unicode® Unihan 数据库（© Unicode, Inc.）。仅含部首/笔画等公开信息，不含任何版权词典（如《新华字典》）的释义内容 |
 
 **CC-CEDICT 署名要求（CC BY-SA 4.0）**：

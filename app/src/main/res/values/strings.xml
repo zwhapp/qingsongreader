@@ -10,6 +10,4 @@
     <string name="delete_book">删除</string>
     <string name="reading_progress">阅读进度</string>
     <string name="no_books">暂无图书</string>
-    <string name="tts">朗读</string>
-    <string name="all_features_unlocked">全部高级功能已解锁</string>
 </resources>

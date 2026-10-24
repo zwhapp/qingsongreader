@@ -2,7 +2,7 @@
 
 安卓原生电子书阅读器。Kotlin + Jetpack Compose 编写，**本地优先、无强制账号、无订阅、无 AI**：全部阅读功能离线可用，联网仅用于你主动开启的 WebDAV 同步、百度网盘导入、应用更新检查与英文单词在线释义，关闭这些后亦可完全离线使用——你读什么、读多久，只发生在你自己的设备上。
 
-当前版本：**v0.5.6**
+当前版本：**v0.5.6**（[更新日志](CHANGELOG.md)）
 
 ## 功能
 
@@ -62,4 +62,7 @@
 
 ## 许可
 
-代码与第三方组件许可见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+- 版权 © 2026 zwhapp 与 QingsongReader 贡献者。
+- 本项目以 [GNU Affero General Public License v3.0](LICENSE)（AGPL-3.0）发布。除第三方组件与内置数据另有声明外，仓库内全部源文件均适用该许可证——本项目采用**根目录集中许可声明**（`LICENSE` + `THIRD-PARTY-NOTICES.md`），未在逐文件头重复声明，以此为准。
+- 分发本应用的二进制（APK）时，须按 AGPL-3.0 第 13 条向接收者提供**完整的对应源码**（可通过本仓库获取）。
+- 第三方组件与内置数据（CC-CEDICT、Unihan 等）的许可证、版本与署名见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)；随 APK 分发的摘要版在 `app/src/main/assets/THIRD_PARTY_LICENSES.txt`。

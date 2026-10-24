@@ -80,9 +80,7 @@ fun PdfPageView(
         key2 = page,
         key3 = renderScale,
     ) {
-        android.util.Log.d("OR_DEBUG", "render start page=$page scale=$renderScale")
         value = withContext(Dispatchers.IO) { renderPage(file, page, renderScale) }
-        android.util.Log.d("OR_DEBUG", "render done page=$page scale=$renderScale null=${value == null}")
     }
 
     Box(
