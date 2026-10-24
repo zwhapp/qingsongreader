@@ -32,6 +32,12 @@ data class ReaderSettings(
     val fullscreen: Boolean = false,
     val volumeKeysTurnPages: Boolean = true,
     /**
+     * Hardware page-turn keys on e-ink readers (Bigme B751C, BOOX, ...):
+     * KEYCODE_PAGE_UP/DOWN and the DPAD directions turn pages in the reader.
+     * Volume keys are controlled separately by [volumeKeysTurnPages].
+     */
+    val pageKeysTurnPages: Boolean = true,
+    /**
      * Reader brightness overlay: 1.0 = no dimming, lower values darken the
      * page with a black overlay (handy for night reading without leaving the
      * app's own theme).
@@ -79,6 +85,7 @@ class SettingsRepository(private val context: Context) {
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val FULLSCREEN = booleanPreferencesKey("fullscreen")
         val VOLUME_KEYS = booleanPreferencesKey("volume_keys")
+        val PAGE_KEYS = booleanPreferencesKey("page_keys")
         val BRIGHTNESS = floatPreferencesKey("reader_brightness")
         val EYE_CARE = booleanPreferencesKey("eye_care")
         val AUTO_LOOKUP = booleanPreferencesKey("auto_lookup")
@@ -110,6 +117,7 @@ class SettingsRepository(private val context: Context) {
             p[Keys.KEEP_SCREEN_ON] = next.keepScreenOn
             p[Keys.FULLSCREEN] = next.fullscreen
             p[Keys.VOLUME_KEYS] = next.volumeKeysTurnPages
+            p[Keys.PAGE_KEYS] = next.pageKeysTurnPages
             p[Keys.BRIGHTNESS] = next.brightness
             p[Keys.EYE_CARE] = next.eyeCare
             p[Keys.AUTO_LOOKUP] = next.autoLookup
@@ -154,6 +162,7 @@ class SettingsRepository(private val context: Context) {
         keepScreenOn = p[Keys.KEEP_SCREEN_ON] ?: false,
         fullscreen = p[Keys.FULLSCREEN] ?: false,
         volumeKeysTurnPages = p[Keys.VOLUME_KEYS] ?: true,
+        pageKeysTurnPages = p[Keys.PAGE_KEYS] ?: true,
         brightness = p[Keys.BRIGHTNESS] ?: 1.0f,
         eyeCare = p[Keys.EYE_CARE] ?: false,
         autoLookup = p[Keys.AUTO_LOOKUP] ?: true,

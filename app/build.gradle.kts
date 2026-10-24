@@ -24,8 +24,8 @@ android {
         applicationId = "com.qingsongreader"
         minSdk = 26
         targetSdk = 34
-        versionCode = 14
-        versionName = "0.5.6"
+        versionCode = 15
+        versionName = "0.5.7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
 

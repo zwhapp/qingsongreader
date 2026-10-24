@@ -49,6 +49,7 @@ import com.qingsongreader.data.prefs.SettingsRepository
 import com.qingsongreader.data.prefs.ThemeMode
 import com.qingsongreader.data.prefs.ViewMode
 import com.qingsongreader.features.update.Updater
+import com.qingsongreader.ui.reader.EinkSupport
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -153,7 +154,7 @@ fun SettingsScreen(
                 )
             }
             Text(
-                "墨水屏模式：纯黑底白字、去掉彩色与动画，适配 Kindle Fire、文石、掌阅等电纸书；" +
+                "墨水屏模式：纯白底纯黑字、去阴影与水波纹、关闭动画，适配 Bigme、文石、掌阅、Kindle 等电纸书；" +
                     "配合「常亮」关闭与翻页键翻页，残影更少、更省电。",
                 style = MaterialTheme.typography.bodySmall
             )
@@ -174,6 +175,34 @@ fun SettingsScreen(
                     label = { Text("常亮") }
                 )
             }
+
+            // ------------------------------------------------ 电纸书适配
+            Text("电纸书适配（Bigme B751C / 文石 / 掌阅等）", style = MaterialTheme.typography.titleMedium)
+            EinkSupport.deviceLabel()?.let { label ->
+                Text(
+                    "已识别设备：$label。建议开启上方「墨水屏 / Kindle」，" +
+                        "并将系统刷新模式设为「高清 / 清晰」档，文字更锐利、残影更少。",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = settings.pageKeysTurnPages,
+                    onClick = { viewModel.update { it.copy(pageKeysTurnPages = !it.pageKeysTurnPages) } },
+                    label = { Text("物理翻页键") }
+                )
+                FilterChip(
+                    selected = settings.volumeKeysTurnPages,
+                    onClick = { viewModel.update { it.copy(volumeKeysTurnPages = !it.volumeKeysTurnPages) } },
+                    label = { Text("音量键翻页") }
+                )
+            }
+            Text(
+                "阅读页内：上键（PAGE_UP / 方向上 / 方向左）= 上一页，下键（PAGE_DOWN / 方向下 / 方向右）= 下一页；" +
+                    "分页与滚动模式、PDF 均生效。开启「音量键翻页」后音量 +/- 同样翻页且不再改动系统音量；" +
+                    "关闭即恢复系统音量功能。长按不连翻，防止误触与残影累积。",
+                style = MaterialTheme.typography.bodySmall
+            )
 
             Text("词典", style = MaterialTheme.typography.titleMedium)
             Text(

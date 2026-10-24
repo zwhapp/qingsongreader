@@ -50,6 +50,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -261,6 +262,20 @@ fun ReaderScreen(
         }
     }
 
+    // Hardware page-turn keys: while this reader is visible, MainActivity
+    // forwards volume / page-up-down / dpad events here. rememberUpdatedState
+    // keeps the registered callback pointing at the latest state without
+    // re-registering on every recomposition.
+    val turnPageHandler by rememberUpdatedState<(Int) -> Unit> { delta -> turnPage(delta) }
+    DisposableEffect(settings.volumeKeysTurnPages, settings.pageKeysTurnPages) {
+        ReaderKeyDispatcher.register(
+            turnPage = { delta -> turnPageHandler(delta) },
+            volume = settings.volumeKeysTurnPages,
+            pageKeys = settings.pageKeysTurnPages
+        )
+        onDispose { ReaderKeyDispatcher.unregister() }
+    }
+
     LaunchedEffect(state.chapterIndex, state.highlights, settings.viewMode) {
         pageLoaded.value = {
             controller.runJs(ReaderScripts.RUNTIME)
@@ -362,6 +377,8 @@ fun ReaderScreen(
                             this.settings.displayZoomControls = false
                             this.isHorizontalScrollBarEnabled = false
                             this.isVerticalScrollBarEnabled = false
+                            // No overscroll glow: on e-ink it smears and ghosts.
+                            this.overScrollMode = android.view.View.OVER_SCROLL_NEVER
                             this.settings.defaultTextEncodingName = "UTF-8"
                             addJavascriptInterface(
                                 ReaderJsBridge(
@@ -461,7 +478,7 @@ fun ReaderScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth(),
-                    tonalElevation = 3.dp
+                    tonalElevation = if (settings.einkMode) 0.dp else 3.dp
                 ) {
                     Column(
                         modifier = Modifier

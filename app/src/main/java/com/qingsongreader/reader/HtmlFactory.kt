@@ -48,7 +48,7 @@ object HtmlFactory {
         val align = if (settings.textAlign == TextAlignSetting.JUSTIFY) "justify" else "left"
         val margin = settings.pageMarginDp
         val paged = settings.viewMode == ViewMode.PAGED
-        val bodyClass = if (paged) "paged" else "scrolled"
+        val bodyClass = (if (paged) "paged" else "scrolled") + if (settings.einkMode) " eink" else ""
         val colWidth = "calc(100vw - ${margin * 2}px)"
         val gap = "${margin * 2}px"
 
@@ -64,7 +64,7 @@ object HtmlFactory {
     --gap: $gap;
     --margin: ${margin}px;
   }
-  html { height: 100%; overflow: hidden; -webkit-text-size-adjust: 100%; }
+  html { height: 100%; overflow: hidden; -webkit-text-size-adjust: 100%; scroll-behavior: auto !important; }
   body {
     margin: 0;
     padding: 0 var(--margin);
@@ -107,6 +107,13 @@ object HtmlFactory {
   .or-title { font-size: 1.3em; font-weight: 700; margin: 1.2em 0; }
   .or-hl { border-radius: 3px; }
   .or-search { background: #FFD54F; color: #000; }
+  /* E-ink (Bigme B751C & friends): strip every transient/decorative effect,
+     lift stroke contrast, and make illustrations dither-friendly. */
+  body.eink { font-weight: 500; overscroll-behavior: none; }
+  body.eink * { box-shadow: none !important; text-shadow: none !important; }
+  body.eink img, body.eink svg { filter: grayscale(100%) contrast(1.12); }
+  body.eink pre { background: #F2F2F2; border: 1px solid #DDDDDD; border-radius: 0; }
+  body.eink .or-search { background: #000000; color: #FFFFFF; }
 </style>
 </head>
 <body class="$bodyClass">

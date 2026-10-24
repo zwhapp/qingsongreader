@@ -140,6 +140,29 @@ fun ReaderSettingsSheet(
             Text("翻页", style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
+                    selected = settings.einkMode,
+                    onClick = { onSettingsChange(settings.copy(einkMode = !settings.einkMode)) },
+                    label = { Text("墨水屏") }
+                )
+                FilterChip(
+                    selected = settings.pageKeysTurnPages,
+                    onClick = { onSettingsChange(settings.copy(pageKeysTurnPages = !settings.pageKeysTurnPages)) },
+                    label = { Text("翻页键") }
+                )
+                FilterChip(
+                    selected = settings.volumeKeysTurnPages,
+                    onClick = { onSettingsChange(settings.copy(volumeKeysTurnPages = !settings.volumeKeysTurnPages)) },
+                    label = { Text("音量键") }
+                )
+            }
+            if (settings.einkMode) {
+                Text(
+                    "墨水屏已开启：纯黑白、去阴影与动画；上下物理键翻页，长按不连翻。",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
                     selected = settings.viewMode == ViewMode.PAGED,
                     onClick = { onSettingsChange(settings.copy(viewMode = ViewMode.PAGED)) },
                     label = { Text("分页") }

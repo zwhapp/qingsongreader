@@ -3,8 +3,10 @@ package com.qingsongreader.ui
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,9 +15,13 @@ import com.qingsongreader.data.prefs.ReaderSettings
 import com.qingsongreader.data.prefs.SettingsRepository
 import com.qingsongreader.data.prefs.ThemeMode
 import com.qingsongreader.ui.nav.AppNav
+import com.qingsongreader.ui.reader.ReaderKeyDispatcher
 import com.qingsongreader.ui.theme.OpenReaderTheme
 
 class MainActivity : ComponentActivity() {
+
+    /** Window animation style captured before e-ink mode zeroes it. */
+    private var savedWindowAnimations: Int = 0
 
     /**
      * Book URI handed over by other apps ("open with" from WeChat, a file
@@ -26,6 +32,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        savedWindowAnimations = window.attributes.windowAnimations
         incomingUri.value = intent?.data
         val settingsRepository = SettingsRepository(this)
 
@@ -35,6 +42,13 @@ class MainActivity : ComponentActivity() {
             )
             val incoming by incomingUri
             val darkTheme = settings.themeMode == ThemeMode.DARK
+            // E-ink panels ghost on animated transitions; drop window animations
+            // app-wide while e-ink mode is on (restored when it is switched off).
+            LaunchedEffect(settings.einkMode) {
+                window.attributes = window.attributes.apply {
+                    windowAnimations = if (settings.einkMode) 0 else savedWindowAnimations
+                }
+            }
             OpenReaderTheme(
                 darkTheme = darkTheme,
                 einkMode = settings.einkMode,
@@ -52,5 +66,15 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (intent.data != null) incomingUri.value = intent.data
+    }
+
+    /**
+     * Hardware page-turn keys (volume / page-up-down / dpad). Intercepted here
+     * because volume keys would otherwise open the system volume panel. The
+     * dispatcher only consumes events while a ReaderScreen is visible.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (ReaderKeyDispatcher.dispatch(event)) return true
+        return super.dispatchKeyEvent(event)
     }
 }

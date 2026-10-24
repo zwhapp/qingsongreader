@@ -1,11 +1,16 @@
 package com.qingsongreader.ui.theme
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -40,14 +45,38 @@ private val DarkColors = darkColorScheme(
 private val EinkColors = lightColorScheme(
     primary = Color(0xFF000000),
     onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFFFFFFF),
+    onPrimaryContainer = Color(0xFF000000),
     secondary = Color(0xFF000000),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFF2F2F2),
+    onSecondaryContainer = Color(0xFF000000),
     tertiary = Color(0xFF000000),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFF2F2F2),
+    onTertiaryContainer = Color(0xFF000000),
     background = Color(0xFFFFFFFF),
     onBackground = Color(0xFF000000),
     surface = Color(0xFFFFFFFF),
     onSurface = Color(0xFF000000),
-    surfaceVariant = Color(0xFFEEEEEE),
-    outline = Color(0xFF000000)
+    surfaceVariant = Color(0xFFF2F2F2),
+    onSurfaceVariant = Color(0xFF111111),
+    surfaceTint = Color(0xFF000000),
+    surfaceContainer = Color(0xFFFFFFFF),
+    surfaceContainerHigh = Color(0xFFF7F7F7),
+    surfaceContainerHighest = Color(0xFFF2F2F2),
+    surfaceContainerLow = Color(0xFFFFFFFF),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    inverseSurface = Color(0xFF000000),
+    inverseOnSurface = Color(0xFFFFFFFF),
+    inversePrimary = Color(0xFFFFFFFF),
+    outline = Color(0xFF000000),
+    outlineVariant = Color(0xFF9E9E9E),
+    scrim = Color(0xFF000000),
+    error = Color(0xFF000000),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFF2F2F2),
+    onErrorContainer = Color(0xFF000000)
 )
 
 val AppTypography = Typography(
@@ -66,6 +95,7 @@ val SerifTypography = Typography(
     bodySmall = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Normal, fontSize = 12.sp)
 )
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun OpenReaderTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -81,6 +111,17 @@ fun OpenReaderTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = if (serif) SerifTypography else AppTypography,
-        content = content
-    )
+    ) {
+        if (einkMode) {
+            // Electrophoretic screens smear every transient pixel change:
+            // no ripple, no overscroll glow/stretch anywhere in the app.
+            CompositionLocalProvider(
+                LocalRippleConfiguration provides null,
+                LocalOverscrollConfiguration provides null,
+                content = content
+            )
+        } else {
+            content()
+        }
+    }
 }
