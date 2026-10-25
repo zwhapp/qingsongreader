@@ -1,7 +1,12 @@
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
 // Mirror a GitHub release (metadata + assets) to the Gitee repo via Gitee API v5.
 // Runs inside .github/workflows/gitee-sync.yml with env:
 //   GITEE_REPO, GITEE_TOKEN, GH_TOKEN, TAG
-// Node >= 18 (global fetch / FormData / Blob). No dependencies.
+// Node >= 18 (global fetch). No dependencies.
 
 const REPO = process.env.GITEE_REPO || "zwhapp/qingsongreader";
 const TAG = process.env.TAG || process.env.GITHUB_REF_NAME;
@@ -114,11 +119,8 @@ async function main() {
     // Upload via curl: node's undici aborts slow multipart uploads at its
     // default 300s headersTimeout (Gitee throttles large uploads), while curl
     // simply waits.
-    const os = await import("node:os");
-    const path = await import("node:path");
-    const { execFileSync } = await import("node:child_process");
     const tmp = path.join(os.tmpdir(), asset.name);
-    require("node:fs").writeFileSync(tmp, buf);
+    fs.writeFileSync(tmp, buf);
     const uploadUrl = giteeUrl(`${GITEE}/repos/${REPO}/releases/${rel.id}/attach_files`);
     let ok = false;
     for (let attempt = 1; attempt <= 3 && !ok; attempt++) {
@@ -140,7 +142,7 @@ async function main() {
         if (attempt < 3) await new Promise((r) => setTimeout(r, 10000));
       }
     }
-    require("node:fs").unlinkSync(tmp);
+    fs.unlinkSync(tmp);
     if (!ok) throw new Error(`upload ${asset.name} failed after 3 attempts`);
   }
 
