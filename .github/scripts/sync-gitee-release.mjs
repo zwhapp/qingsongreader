@@ -24,6 +24,13 @@ const ghHeaders = {
   "User-Agent": "qingsongreader-gitee-sync",
 };
 
+// Gitee API v5 authenticates via the access_token query parameter (works for
+// GET/POST/PATCH and multipart uploads alike).
+function giteeUrl(path) {
+  const sep = path.includes("?") ? "&" : "?";
+  return `${GITEE}${path}${sep}access_token=${encodeURIComponent(process.env.GITEE_TOKEN)}`;
+}
+
 async function ghJson(url) {
   const r = await fetch(url, { headers: ghHeaders });
   if (!r.ok) throw new Error(`GitHub ${url} -> ${r.status}`);
@@ -31,7 +38,7 @@ async function ghJson(url) {
 }
 
 async function giteeJson(url, opts = {}) {
-  const r = await fetch(url, {
+  const r = await fetch(giteeUrl(url), {
     ...opts,
     headers: { "User-Agent": "qingsongreader-gitee-sync", ...(opts.headers || {}) },
   });
@@ -77,7 +84,7 @@ async function main() {
       body: JSON.stringify({ name: gh.name || gh.tag_name, body: gh.body || "" }),
     });
     if (!patched.ok) {
-      console.log(`WARN: patch gitee release -> ${patched.status} (continuing)`);
+      throw new Error(`patch gitee release -> ${patched.status} ${JSON.stringify(patched.body).slice(0, 200)}`);
     }
     console.log(`gitee release exists: id=${rel.id}`);
   }

@@ -15,7 +15,19 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      # NOTE: android-actions/setup-android@v3 is unusable on current runners
+      # (it installs the removed legacy "tools" package and fails). The Android
+      # SDK with cmdline-tools is preinstalled on ubuntu-latest; install the
+      # pieces this project needs directly.
+      - name: Set up Android SDK
+        run: |
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          SDKMANAGER=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -1)
+          echo "using sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" \
+            "platform-tools" "platforms;android-34" "build-tools;34.0.0" "build-tools;35.0.0"
       - name: Build debug APK and run unit tests
         run: |
           chmod +x gradlew
