@@ -111,16 +111,37 @@ async function main() {
     if (buf.length < 1024) throw new Error(`download ${asset.name} -> suspicious size ${buf.length}`);
     console.log(`downloaded ${asset.name} (${buf.length} bytes)`);
 
-    const fd = new FormData();
-    fd.append("file", new Blob([buf]), asset.name);
-    const up = await giteeJson(`${GITEE}/repos/${REPO}/releases/${rel.id}/attach_files`, {
-      method: "POST",
-      body: fd,
-    });
-    if (!up.ok) {
-      throw new Error(`upload ${asset.name} -> ${up.status} ${JSON.stringify(up.body).slice(0, 300)}`);
+    // Upload via curl: node's undici aborts slow multipart uploads at its
+    // default 300s headersTimeout (Gitee throttles large uploads), while curl
+    // simply waits.
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const { execFileSync } = await import("node:child_process");
+    const tmp = path.join(os.tmpdir(), asset.name);
+    require("node:fs").writeFileSync(tmp, buf);
+    const uploadUrl = giteeUrl(`${GITEE}/repos/${REPO}/releases/${rel.id}/attach_files`);
+    let ok = false;
+    for (let attempt = 1; attempt <= 3 && !ok; attempt++) {
+      try {
+        const out = execFileSync(
+          "curl",
+          [
+            "-sS", "--fail-with-body", "-X", "POST",
+            "-H", "Expect:", // avoid curl's default "Expect: 100-continue" wait
+            "-F", `file=@${tmp};filename=${asset.name};type=application/vnd.android.package-archive`,
+            uploadUrl,
+          ],
+          { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+        );
+        console.log(`uploaded to gitee: ${asset.name} (attempt ${attempt}) ${out.slice(0, 120)}`);
+        ok = true;
+      } catch (e) {
+        console.log(`upload attempt ${attempt} failed: ${(e.stderr || e.message || "").toString().slice(0, 200)}`);
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 10000));
+      }
     }
-    console.log(`uploaded to gitee: ${asset.name}`);
+    require("node:fs").unlinkSync(tmp);
+    if (!ok) throw new Error(`upload ${asset.name} failed after 3 attempts`);
   }
 
   // 4. verify
