@@ -55,7 +55,21 @@
 
 ## 下载
 
-到 [Releases](https://github.com/zwhapp/qingsongreader/releases) 页面下载最新 APK（debug 签名，直接安装）。国内访问 GitHub 慢或失败时，可在任意镜像前缀后拼接完整 Release 链接下载，例如 `https://gh-proxy.com/https://github.com/zwhapp/qingsongreader/releases/...`。
+- **Gitee 极速下载（国内直连，推荐）**：[gitee.com/zwhapp/qingsongreader/releases](https://gitee.com/zwhapp/qingsongreader/releases)——每次 GitHub 发版后由 CI 自动同步代码与安装包，内容与 GitHub 完全一致
+- **GitHub Releases**：[github.com/zwhapp/qingsongreader/releases](https://github.com/zwhapp/qingsongreader/releases)（源站点，debug 签名，直接安装）
+- 国内访问 GitHub 慢或失败时，也可在任意镜像前缀后拼接完整 Release 链接下载，例如 `https://gh-proxy.com/https://github.com/zwhapp/qingsongreader/releases/...`
+
+## 持续集成 / 发布自动化
+
+GitHub 为唯一事实源，三处内容自动保持一致，无需任何手动操作：
+
+| 组件 | 触发时机 | 动作 |
+| --- | --- | --- |
+| [CI](.github/workflows/ci.yml) | 每次 push / PR 到 main | Gradle 构建 debug APK + 单元测试 |
+| [Gitee 同步](.github/workflows/gitee-sync.yml) | GitHub release 发布（或手动触发） | 推送 main + 全部 tags 到 Gitee 镜像仓库，创建同名 release 并上传全部资产，校验资产完整性 |
+| 发布页同步 | 定时巡检（每 6 小时） | 从 GitHub 取最新版本与下载统计、核对 Gitee 镜像状态，更新[发布页](https://qingsongreader.app.workbuddy.host/?sharecode=H3LBGLYP7D)（版本 / 日期 / 大小 / Gitee 极速下载链接）并部署 |
+
+仓库 secrets：`GITEE_TOKEN`（Gitee 私人令牌，projects 权限；`GITEE_USERNAME` 可选，默认取仓库 owner）。
 
 ## 隐私
 

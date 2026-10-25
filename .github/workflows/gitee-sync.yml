@@ -1,0 +1,67 @@
+name: Sync to Gitee
+
+# GitHub 是唯一事实源：release 一经发布，本工作流自动
+#   1) 把仓库代码（main + 全部 tags）推送到 Gitee 镜像仓库
+#   2) 在 Gitee 创建同名 release 并上传全部资产（APK）
+# 发布页的同步由 WorkBuddy 侧 sync_site.py + 定时巡检完成（见 SYNC.md）。
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to sync (e.g. v0.5.7)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    env:
+      GITEE_REPO: zwhapp/qingsongreader
+      # 用户名默认取仓库 owner；如 Gitee 账号名不同，配置 secret GITEE_USERNAME
+      GITEE_USERNAME: ${{ secrets.GITEE_USERNAME || 'zwhapp' }}
+      GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push repository to Gitee (retry x3)
+        run: |
+          if [ -z "$GITEE_TOKEN" ]; then
+            echo "ERROR: secret GITEE_TOKEN is not set"; exit 1
+          fi
+          for i in 1 2 3; do
+            if git push --force "https://${GITEE_USERNAME}:${GITEE_TOKEN}@gitee.com/${GITEE_REPO}.git" HEAD:refs/heads/main --tags; then
+              echo "gitee push ok (attempt $i)"; exit 0
+            fi
+            echo "gitee push failed (attempt $i), retrying in 15s..."; sleep 15
+          done
+          echo "ERROR: gitee push failed after 3 attempts"; exit 1
+
+      - name: Mirror release metadata and assets to Gitee
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: node .github/scripts/sync-gitee-release.mjs
+
+      - name: Verify Gitee release assets
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          echo "Gitee release page: https://gitee.com/${GITEE_REPO}/releases"
+          curl -fsS "https://gitee.com/api/v5/repos/${GITEE_REPO}/releases/tags/${TAG}" \
+            | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const r=JSON.parse(d);console.log('tag:',r.tag_name);console.log('assets:',(r.assets||[]).map(a=>a.name).join(', ')||'(none)');if(!(r.assets||[]).length){console.error('ERROR: no assets on Gitee release');process.exit(1)}})"
