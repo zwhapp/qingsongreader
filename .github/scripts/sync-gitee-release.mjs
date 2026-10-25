@@ -25,8 +25,10 @@ const ghHeaders = {
 };
 
 // Gitee API v5 authenticates via the access_token query parameter (works for
-// GET/POST/PATCH and multipart uploads alike).
-function giteeUrl(path) {
+// GET/POST/PATCH and multipart uploads alike). Accepts either a path
+// ("/repos/x/y") or a full URL as input.
+function giteeUrl(url) {
+  const path = url.startsWith(GITEE) ? url.slice(GITEE.length) : url;
   const sep = path.includes("?") ? "&" : "?";
   return `${GITEE}${path}${sep}access_token=${encodeURIComponent(process.env.GITEE_TOKEN)}`;
 }
@@ -81,7 +83,11 @@ async function main() {
     const patched = await giteeJson(`${GITEE}/repos/${REPO}/releases/${rel.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: gh.name || gh.tag_name, body: gh.body || "" }),
+      body: JSON.stringify({
+        tag_name: gh.tag_name,
+        name: gh.name || gh.tag_name,
+        body: gh.body || "",
+      }),
     });
     if (!patched.ok) {
       throw new Error(`patch gitee release -> ${patched.status} ${JSON.stringify(patched.body).slice(0, 200)}`);
@@ -96,9 +102,13 @@ async function main() {
       console.log(`skip (already present): ${asset.name}`);
       continue;
     }
-    const dl = await fetch(asset.url, { headers: ghHeaders }); // API url -> binary download
+    // asset.url is the API URL; the binary body requires octet-stream Accept
+    const dl = await fetch(asset.url, {
+      headers: { ...ghHeaders, Accept: "application/octet-stream" },
+    });
     if (!dl.ok) throw new Error(`download ${asset.name} -> ${dl.status}`);
     const buf = Buffer.from(await dl.arrayBuffer());
+    if (buf.length < 1024) throw new Error(`download ${asset.name} -> suspicious size ${buf.length}`);
     console.log(`downloaded ${asset.name} (${buf.length} bytes)`);
 
     const fd = new FormData();
