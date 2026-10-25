@@ -45,18 +45,29 @@ async function ghJson(url) {
 }
 
 async function giteeJson(url, opts = {}) {
-  const r = await fetch(giteeUrl(url), {
-    ...opts,
-    headers: { "User-Agent": "qingsongreader-gitee-sync", ...(opts.headers || {}) },
-  });
-  const text = await r.text();
-  let body = null;
-  try {
-    body = text ? JSON.parse(text) : null;
-  } catch {
-    /* non-JSON error page */
+  // Gitee throttles overseas (GitHub runner) IPs hard; a long upload can leave
+  // the connection unusable for the immediately following request. Retry.
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const r = await fetch(giteeUrl(url), {
+        ...opts,
+        headers: { "User-Agent": "qingsongreader-gitee-sync", ...(opts.headers || {}) },
+      });
+      const text = await r.text();
+      let body = null;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch {
+        /* non-JSON error page */
+      }
+      return { ok: r.ok, status: r.status, body };
+    } catch (e) {
+      if (attempt === 4) throw e;
+      const wait = attempt * 5000;
+      console.log(`gitee call failed (${e.message}), retry ${attempt}/3 in ${wait / 1000}s`);
+      await new Promise((r) => setTimeout(r, wait));
+    }
   }
-  return { ok: r.ok, status: r.status, body };
 }
 
 async function main() {
